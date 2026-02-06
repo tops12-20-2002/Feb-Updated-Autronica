@@ -1,0 +1,29 @@
+# Dependencies
+vendor/
+node_modules/
+
+# Logs
+logs/
+*.log
+
+# Build outputs
+frontend/build/
+frontend/dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Composer
+composer.lock
+
+# Temporary files
+*.tmp
+*.temp
