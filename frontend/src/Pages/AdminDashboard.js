@@ -430,7 +430,6 @@ function AdminDashboard() {
       alert('Failed to delete job order. Please try again.');
     }
   };
-  
 
   const resetJobForm = () => {
     setClientName("");
