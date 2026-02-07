@@ -28,6 +28,7 @@ function MechanicDashboard() {
   const [editJobId, setEditJobId] = useState(null);
   const [jobStatusFilter, setJobStatusFilter] = useState("All");
   const [jobSearch, setJobSearch] = useState("");
+  const [isJobReadOnly, setIsJobReadOnly] = useState(false);
 
   // form fields
   const [jobOrderNo, setJobOrderNo] = useState(0);
@@ -335,6 +336,7 @@ function MechanicDashboard() {
     setSubtotal(0);
     setDiscount("");
     setGrandTotal(0);
+    setIsJobReadOnly(false);
   };
 
   const handleEditJob = (jobId) => {
@@ -342,6 +344,7 @@ function MechanicDashboard() {
     if (!job) return;
 
     setEditJobId(jobId);
+    setIsJobReadOnly(job.status === "Completed");
     setClientName(job.client || job.customer_name || "");
     setVehicleModel(job.vehicleModel || job.model || "");
     setPlateNumber(job.plate || job.plate_no || "");
@@ -504,12 +507,13 @@ function MechanicDashboard() {
   };
   const todayKey = new Date().toISOString().slice(0, 10);
   const currentYear = todayKey.slice(0, 4);
-  const totalSales = jobOrders.reduce((sum, o) => {
+  const completedOrders = jobOrders.filter(o => o.status === "Completed");
+  const totalSales = completedOrders.reduce((sum, o) => {
     const dateKey = (o.dateIn || o.date || "").slice(0, 10);
     if (!dateKey.startsWith(currentYear)) return sum;
     return sum + (parseFloat(o.total || o.total_amount || 0) || 0);
   }, 0);
-  const dailySales = jobOrders.reduce((sum, o) => {
+  const dailySales = completedOrders.reduce((sum, o) => {
     const dateKey = (o.dateIn || o.date || "").slice(0, 10);
     if (dateKey !== todayKey) return sum;
     return sum + (parseFloat(o.total || o.total_amount || 0) || 0);
@@ -533,8 +537,12 @@ function MechanicDashboard() {
     return { profit };
   };
 
-  const totalProfit = jobOrders.reduce((sum, o) => sum + computeOrderTotals(o).profit, 0);
-  const dailyProfit = jobOrders.reduce((sum, o) => {
+  const totalProfit = completedOrders.reduce((sum, o) => {
+    const dateKey = (o.dateIn || o.date || "").slice(0, 10);
+    if (!dateKey.startsWith(currentYear)) return sum;
+    return sum + computeOrderTotals(o).profit;
+  }, 0);
+  const dailyProfit = completedOrders.reduce((sum, o) => {
     const dateKey = (o.dateIn || o.date || "").slice(0, 10);
     if (dateKey !== todayKey) return sum;
     return sum + computeOrderTotals(o).profit;
@@ -661,7 +669,9 @@ function MechanicDashboard() {
                           <td>{o.dateIn || o.date}</td>
                           <td>{o.dateRelease || o.date_release || "-"}</td>
                           <td className="actions">
-                            <button className="view-edit-btn" onClick={() => handleEditJob(o.id)}>Edit</button>
+                            <button className="view-edit-btn" onClick={() => handleEditJob(o.id)}>
+                              {o.status === "Completed" ? "View/Print" : "Edit"}
+                            </button>
                             <button className="delete-btn" onClick={() => handleDeleteJobOrder(o.id)} style={{ marginLeft: 8 }}>Delete</button>
                           </td>
                         </tr>
@@ -692,15 +702,15 @@ function MechanicDashboard() {
                 <div className="form-grid">
                   <div className="left">
                     <label>Client Name</label>
-                    <input type="text" placeholder="Enter client name" value={clientName} onChange={(e) => setClientName(e.target.value)} />
+                    <input type="text" placeholder="Enter client name" value={clientName} onChange={(e) => setClientName(e.target.value)} disabled={isJobReadOnly} />
                     <label>Address</label>
-                    <input type="text" placeholder="Enter address" value={address} onChange={(e) => setAddress(e.target.value)} />
+                    <input type="text" placeholder="Enter address" value={address} onChange={(e) => setAddress(e.target.value)} disabled={isJobReadOnly} />
                     <label>Vehicle Model</label>
-                    <input type="text" placeholder="Enter vehicle model" value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} />
+                    <input type="text" placeholder="Enter vehicle model" value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} disabled={isJobReadOnly} />
                     <label>Date In</label>
-                    <input type="date" value={dateIn} onChange={(e) => setDateIn(e.target.value)} />
+                    <input type="date" value={dateIn} onChange={(e) => setDateIn(e.target.value)} disabled={isJobReadOnly} />
                     <label>Assigned To</label>
-                    <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)}>
+                    <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} disabled={isJobReadOnly}>
                       <option value="">Select</option>
                       <option value="Technician A">Technician A</option>
                       <option value="Technician B">Technician B</option>
@@ -711,20 +721,20 @@ function MechanicDashboard() {
                   </div>
                   <div className="right">
                     <label>Customer Type</label>
-                    <select value={customerType} onChange={(e) => setCustomerType(e.target.value)}>
+                    <select value={customerType} onChange={(e) => setCustomerType(e.target.value)} disabled={isJobReadOnly}>
                       <option value="">Select</option>
-                      <option value="LGU">LGU</option>
                       <option value="Private">Private</option>
+                      <option value="LGU">LGU</option>
                       <option value="STAN">STAN</option>
                     </select>
                     <label>Contact Number</label>
-                    <input type="text" placeholder="Enter contact number" value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} />
+                    <input type="text" placeholder="Enter contact number" value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} disabled={isJobReadOnly} />
                     <label>Plate Number</label>
-                    <input type="text" placeholder="Enter plate number" value={plateNumber} onChange={(e) => setPlateNumber(e.target.value)} />
+                    <input type="text" placeholder="Enter plate number" value={plateNumber} onChange={(e) => setPlateNumber(e.target.value)} disabled={isJobReadOnly} />
                     <label>Date Release</label>
-                    <input type="date" value={dateRelease} onChange={(e) => setDateRelease(e.target.value)} />
+                    <input type="date" value={dateRelease} onChange={(e) => setDateRelease(e.target.value)} disabled={isJobReadOnly} />
                     <label>Status</label>
-                    <select value={status} onChange={(e) => setStatus(e.target.value)}>
+                    <select value={status} onChange={(e) => setStatus(e.target.value)} disabled={isJobReadOnly}>
                       <option>Pending</option>
                       <option>In Progress</option>
                       <option>Completed</option>
@@ -738,15 +748,15 @@ function MechanicDashboard() {
                 </div>
                 {services.map((s, i) => (
                   <div className="item-row services-row" key={`s-${i}`}>
-                    <input type="text" placeholder="Description" value={s.description} onChange={(e) => updateService(i, "description", e.target.value)} />
-                    <input type="text" placeholder="Unit" value={s.unit} onChange={(e) => updateService(i, "unit", e.target.value)} />
-                    <input type="number" min="0" placeholder="Qty" value={s.qty} onChange={(e) => updateService(i, "qty", e.target.value)} />
-                    <input type="number" min="0" step="0.01" placeholder="Price" value={s.unitPrice} onChange={(e) => updateService(i, "price", e.target.value)} onFocus={(e) => e.target.select()} />
+                    <input type="text" placeholder="Description" value={s.description} onChange={(e) => updateService(i, "description", e.target.value)} disabled={isJobReadOnly} />
+                    <input type="text" placeholder="Unit" value={s.unit} onChange={(e) => updateService(i, "unit", e.target.value)} disabled={isJobReadOnly} />
+                    <input type="number" min="0" placeholder="Qty" value={s.qty} onChange={(e) => updateService(i, "qty", e.target.value)} disabled={isJobReadOnly} />
+                    <input type="number" min="0" step="0.01" placeholder="Price" value={s.unitPrice} onChange={(e) => updateService(i, "price", e.target.value)} onFocus={(e) => e.target.select()} disabled={isJobReadOnly} />
                     <input type="number" min="0" step="0.01" placeholder="Total Price" value={s.price} />
-                    <button className="delete-box" onClick={() => deleteService(i)} aria-label="Delete service">×</button>
+                    <button className="delete-box" onClick={() => deleteService(i)} aria-label="Delete service" disabled={isJobReadOnly}>×</button>
                   </div>
                 ))}
-                <button className="small-btn" onClick={addServiceRow}>+ Add Service</button>
+                <button className="small-btn" onClick={addServiceRow} disabled={isJobReadOnly}>+ Add Service</button>
 
                 <h3 className="section-title">Parts</h3>
                 <div className="table-headers parts-head">
@@ -765,15 +775,16 @@ function MechanicDashboard() {
                           updatePart(i, "description", e.currentTarget.value, { commit: true });
                         }
                       }}
+                      disabled={isJobReadOnly}
                     />
-                    <input type="text" placeholder="Unit" value={p.unit} onChange={(e) => updatePart(i, "unit", e.target.value)} />
-                    <input type="number" min="0" placeholder="Qty" value={p.qty} onChange={(e) => updatePart(i, "qty", e.target.value)} />
-                    <input type="number" min="0" step="0.01" placeholder="Price" value={p.unitPrice} onChange={(e) => updatePart(i, "price", e.target.value)} onFocus={(e) => e.target.select()} />
+                    <input type="text" placeholder="Unit" value={p.unit} onChange={(e) => updatePart(i, "unit", e.target.value)} disabled={isJobReadOnly} />
+                    <input type="number" min="0" placeholder="Qty" value={p.qty} onChange={(e) => updatePart(i, "qty", e.target.value)} disabled={isJobReadOnly} />
+                    <input type="number" min="0" step="0.01" placeholder="Price" value={p.unitPrice} onChange={(e) => updatePart(i, "price", e.target.value)} onFocus={(e) => e.target.select()} disabled={isJobReadOnly} />
                     <input type="number" min="0" step="0.01" placeholder="Total Price" value={p.price} />
-                    <button className="delete-box" onClick={() => deletePart(i)} aria-label="Delete part">×</button>
+                    <button className="delete-box" onClick={() => deletePart(i)} aria-label="Delete part" disabled={isJobReadOnly}>×</button>
                   </div>
                 ))}
-                <button className="small-btn" onClick={addPartRow}>+ Add Part</button>
+                <button className="small-btn" onClick={addPartRow} disabled={isJobReadOnly}>+ Add Part</button>
 
                 <hr />
                 <div className="totals">
@@ -788,6 +799,7 @@ function MechanicDashboard() {
                       value={discount}
                       onChange={(e) => setDiscount(e.target.value)}
                       style={{ width: 120, marginLeft: 6 }}
+                      disabled={isJobReadOnly}
                     />
                   </p>
                   <p><b>Total: ₱{Number(grandTotal).toFixed(2)}</b></p>
@@ -796,7 +808,7 @@ function MechanicDashboard() {
 
               <div className="modal-footer" style={{ justifyContent: "flex-end", gap: 12 }}>
                 <button className="footer-btn back" onClick={() => { setShowJobOrderModal(false); setEditJobId(null); resetJobForm(); }}>Cancel</button>
-                <button className="footer-btn finalize" onClick={saveJobOrder} disabled={!isJobFormValid()}>Save</button>
+                <button className="footer-btn finalize" onClick={saveJobOrder} disabled={!isJobFormValid() || isJobReadOnly}>Save</button>
               </div>
             </div>
           </div>
@@ -807,3 +819,5 @@ function MechanicDashboard() {
 }
 
 export default MechanicDashboard;
+
+
