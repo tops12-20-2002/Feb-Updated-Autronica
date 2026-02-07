@@ -151,11 +151,12 @@ function AdminDashboard() {
     return { totalLabor, totalPartsPrice, unitPriceTotal, totalAmount, profit, discountValue };
   };
 
+  const completedOrders = jobOrders.filter(o => o.status === "Completed");
   const salesByDate = salesDate
-    ? jobOrders.filter(o => toDateKey(getOrderDate(o)) === salesDate)
+    ? completedOrders.filter(o => toDateKey(getOrderDate(o)) === salesDate)
     : [];
   const salesByRange = salesStartDate && salesEndDate
-    ? jobOrders.filter(o => {
+    ? completedOrders.filter(o => {
       const key = toDateKey(getOrderDate(o));
       return key >= salesStartDate && key <= salesEndDate;
     })
@@ -179,14 +180,14 @@ function AdminDashboard() {
     return sum + totals.profit;
   }, 0);
 
-  const totalProfit = jobOrders.reduce((sum, o) => {
+  const totalProfit = completedOrders.reduce((sum, o) => {
     const totals = computeOrderTotals(o);
     return sum + totals.profit;
   }, 0);
 
   const filteredSalesOrders = salesLogDate
-    ? jobOrders.filter(o => toDateKey(getOrderDate(o)) === salesLogDate)
-    : jobOrders;
+    ? completedOrders.filter(o => toDateKey(getOrderDate(o)) === salesLogDate)
+    : completedOrders;
 
   const getCustomerMultiplier = (type) => {
     const vat = 1.12;
@@ -739,17 +740,17 @@ function AdminDashboard() {
 
   const todayKey = new Date().toISOString().slice(0, 10);
   const currentYear = todayKey.slice(0, 4);
-  const totalSales = jobOrders.reduce((sum, o) => {
+  const totalSales = completedOrders.reduce((sum, o) => {
     const dateKey = (o.dateIn || o.date || "").slice(0, 10);
     if (!dateKey.startsWith(currentYear)) return sum;
     return sum + (parseFloat(o.total || o.total_amount || 0) || 0);
   }, 0);
-  const dailySales = jobOrders.reduce((sum, o) => {
+  const dailySales = completedOrders.reduce((sum, o) => {
     const dateKey = (o.dateIn || o.date || "").slice(0, 10);
     if (dateKey !== todayKey) return sum;
     return sum + (parseFloat(o.total || o.total_amount || 0) || 0);
   }, 0);
-  const dailyProfit = jobOrders.reduce((sum, o) => {
+  const dailyProfit = completedOrders.reduce((sum, o) => {
     const dateKey = (o.dateIn || o.date || "").slice(0, 10);
     if (dateKey !== todayKey) return sum;
     const totals = computeOrderTotals(o);
@@ -974,8 +975,8 @@ function AdminDashboard() {
             <div className="sales-cards">
               <div className="sales-card">
                 <h4>Daily Summary Report</h4>
-                <p>Total Sales: ₱{totalSales.toFixed(2)}</p>
-                <p>Total Profit: ₱{totalProfit.toFixed(2)}</p>
+                <p>Total Sales: ₱{dailySales.toFixed(2)}</p>
+                <p>Total Profit: ₱{dailyProfit.toFixed(2)}</p>
               </div>
               <div className="sales-card">
                 <h4>View Sales by Date</h4>
