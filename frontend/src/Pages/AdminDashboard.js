@@ -1019,7 +1019,7 @@ function AdminDashboard() {
                     <th>Date</th>
                     <th>Job Order No.</th>
                     <th>Vehicle / Plate No.</th>
-                    <th>Total Labor (₱)</th>
+                    <th>Total Service (₱)</th>
                     <th>Total Parts Price (₱)</th>
                     <th>Unit Price (₱)</th>
                     <th>Discount (₱)</th>

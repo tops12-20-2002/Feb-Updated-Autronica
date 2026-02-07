@@ -343,6 +343,26 @@ function MechanicDashboard() {
     const job = jobOrders.find(j => j.id === jobId);
     if (!job) return;
 
+    const normalizedServices = job.services && job.services.length > 0
+      ? job.services.map((s) => ({
+          description: s.description ?? "",
+          unit: s.unit ?? "",
+          qty: s.qty ?? s.quantity ?? "",
+          price: s.price ?? "",
+          unitPrice: s.unitPrice ?? s.unit_price ?? s.price ?? "",
+        }))
+      : [{ description: "", unit: "", qty: "", price: "", unitPrice: "" }];
+
+    const normalizedParts = job.parts && job.parts.length > 0
+      ? job.parts.map((p) => ({
+          description: p.description ?? "",
+          unit: p.unit ?? "",
+          qty: p.qty ?? p.quantity ?? "",
+          price: p.price ?? "",
+          unitPrice: p.unitPrice ?? p.unit_price ?? p.price ?? "",
+        }))
+      : [{ description: "", qty: "", unit: "", price: "", unitPrice: "" }];
+
     setEditJobId(jobId);
     setIsJobReadOnly(job.status === "Completed");
     setClientName(job.client || job.customer_name || "");
@@ -355,10 +375,10 @@ function MechanicDashboard() {
     setDateRelease(job.dateRelease || job.date_release || "");
     setAssignedTo(job.assignedTo || job.assigned_to || "");
     setStatus(job.status || "Pending");
-    setServices(job.services && job.services.length > 0 ? job.services : [{ description: "", unit: "", qty: "", price: "" }]);
-    setParts(job.parts && job.parts.length > 0 ? job.parts : [{ description: "", qty: "", unit: "", price: "", unitPrice: "" }]);
+    setServices(normalizedServices);
+    setParts(normalizedParts);
     setSubtotal(parseFloat(job.subtotal || 0));
-    setDiscount(!job.discount ? "" : String(job.discount));
+    setDiscount(job.discount === null || job.discount === undefined ? "" : String(job.discount));
     setGrandTotal(parseFloat(job.total || job.total_amount || 0));
     setShowJobOrderModal(true);
   };
@@ -819,5 +839,4 @@ function MechanicDashboard() {
 }
 
 export default MechanicDashboard;
-
 
