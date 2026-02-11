@@ -44,6 +44,9 @@ try {
             $name = trim($data['name'] ?? '');
             $quantity = intval($data['quantity'] ?? $data['stocks'] ?? 0);
             $price = floatval($data['price'] ?? 0);
+            $srpPrivate = floatval($data['srpPrivate'] ?? $data['srp_private'] ?? 0);
+            $srpLgu = floatval($data['srpLgu'] ?? $data['srp_lgu'] ?? 0);
+            $srpStan = floatval($data['srpStan'] ?? $data['srp_stan'] ?? 0);
             $code = trim($data['code'] ?? '');
             $partNumber = trim($data['partNumber'] ?? $data['part_number'] ?? '');
             $category = trim($data['category'] ?? '');
@@ -77,9 +80,9 @@ try {
             }
 
             // ✅ COMPUTE SRP VALUES (based on your React computation)
-            $srpPrivate = round($price * 1.25 * 1.12, 2);
-            $srpLgu = round($price * 1.60 * 1.12, 2);
-            $srpStan = round($price * 1.30 * 1.12, 2);
+            if ($srpPrivate <= 0) $srpPrivate = round($price * 1.25 * 1.12, 2);
+            if ($srpLgu <= 0) $srpLgu = round($price * 1.60 * 1.12, 2);
+            if ($srpStan <= 0) $srpStan = round($price * 1.30 * 1.12, 2);
 
             $stmt = $pdo->prepare("INSERT INTO inventory (
                 code, part_number, description, category, quantity, min_quantity,
@@ -138,6 +141,9 @@ try {
             $name = trim($data['name'] ?? '');
             $quantity = intval($data['quantity'] ?? $data['stocks'] ?? 0);
             $price = floatval($data['price'] ?? 0);
+            $srpPrivate = floatval($data['srpPrivate'] ?? $data['srp_private'] ?? 0);
+            $srpLgu = floatval($data['srpLgu'] ?? $data['srp_lgu'] ?? 0);
+            $srpStan = floatval($data['srpStan'] ?? $data['srp_stan'] ?? 0);
             $code = trim($data['code'] ?? '');
             $partNumber = trim($data['partNumber'] ?? $data['part_number'] ?? '');
             $category = trim($data['category'] ?? '');
@@ -157,9 +163,17 @@ try {
             }
 
             // ✅ COMPUTE SRP VALUES
-            $srpPrivate = round($price * 0.63, 2);
-            $srpLgu = round($price * 0.28, 2);
-            $srpStan = round($price * 0.58, 2);
+            if ($srpPrivate <= 0 || $srpLgu <= 0 || $srpStan <= 0) {
+                $stmt = $pdo->prepare("SELECT srp_private, srp_lgu, srp_stan FROM inventory WHERE id = ?");
+                $stmt->execute([$id]);
+                $existingSrp = $stmt->fetch();
+                if (!$existingSrp) {
+                    sendValidationError('Item not found');
+                }
+                if ($srpPrivate <= 0) $srpPrivate = floatval($existingSrp['srp_private'] ?? 0);
+                if ($srpLgu <= 0) $srpLgu = floatval($existingSrp['srp_lgu'] ?? 0);
+                if ($srpStan <= 0) $srpStan = floatval($existingSrp['srp_stan'] ?? 0);
+            }
 
             $stmt = $pdo->prepare("UPDATE inventory SET 
                 code = ?, 

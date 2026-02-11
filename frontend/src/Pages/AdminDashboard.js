@@ -29,10 +29,6 @@ function AdminDashboard() {
   const [isJobReadOnly, setIsJobReadOnly] = useState(false);
   const [inventorySearch, setInventorySearch] = useState("");
   const [jobSearch, setJobSearch] = useState("");
-  const [salesDate, setSalesDate] = useState("");
-  const [salesStartDate, setSalesStartDate] = useState("");
-  const [salesEndDate, setSalesEndDate] = useState("");
-  const [salesLogDate, setSalesLogDate] = useState("");
 
   // form fields
   const [jobOrderNo, setJobOrderNo] = useState(0);
@@ -45,6 +41,7 @@ function AdminDashboard() {
   const [dateRelease, setDateRelease] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
   const [status, setStatus] = useState("Pending");
+  const [paymentType, setPaymentType] = useState("Cash");
   const [address, setAddress] = useState("");
   const [services, setServices] = useState([{ description: "", qty: "", unit: "", price: "", unitPrice: "" }]);
   const [parts, setParts] = useState([{ description: "", qty: "", unit: "", price: "", unitPrice: "" }]);
@@ -121,12 +118,6 @@ function AdminDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [services, parts, customerType, discount]);
 
-  const getOrderDate = (order) => order.dateIn || order.date || "";
-  const toDateKey = (dateStr) => {
-    if (!dateStr) return "";
-    return dateStr.slice(0, 10);
-  };
-
   const computeOrderTotals = (order) => {
     const servicesList = order.services || [];
     const partsList = order.parts || [];
@@ -153,42 +144,10 @@ function AdminDashboard() {
   };
 
   const completedOrders = jobOrders.filter(o => o.status === "Completed");
-  const salesByDate = salesDate
-    ? completedOrders.filter(o => toDateKey(getOrderDate(o)) === salesDate)
-    : [];
-  const salesByRange = salesStartDate && salesEndDate
-    ? completedOrders.filter(o => {
-      const key = toDateKey(getOrderDate(o));
-      return key >= salesStartDate && key <= salesEndDate;
-    })
-    : [];
-
-  const totalSalesByDate = salesByDate.reduce((sum, o) => {
-    const totals = computeOrderTotals(o);
-    return sum + totals.totalAmount;
-  }, 0);
-  const totalProfitByDate = salesByDate.reduce((sum, o) => {
-    const totals = computeOrderTotals(o);
-    return sum + totals.profit;
-  }, 0);
-
-  const totalSalesByRange = salesByRange.reduce((sum, o) => {
-    const totals = computeOrderTotals(o);
-    return sum + totals.totalAmount;
-  }, 0);
-  const totalProfitByRange = salesByRange.reduce((sum, o) => {
-    const totals = computeOrderTotals(o);
-    return sum + totals.profit;
-  }, 0);
-
   const totalProfit = completedOrders.reduce((sum, o) => {
     const totals = computeOrderTotals(o);
     return sum + totals.profit;
   }, 0);
-
-  const filteredSalesOrders = salesLogDate
-    ? completedOrders.filter(o => toDateKey(getOrderDate(o)) === salesLogDate)
-    : completedOrders;
 
   const getCustomerMultiplier = (type) => {
     const vat = 1.12;
@@ -376,6 +335,7 @@ function AdminDashboard() {
       dateIn,
       dateRelease: dateRelease || null,
       status: statusOverride || status,
+      paymentType,
       services,
       parts,
       subtotal,
@@ -443,6 +403,7 @@ function AdminDashboard() {
     setDateRelease("");
     setAssignedTo("");
     setStatus("Pending");
+    setPaymentType("Cash");
     setAddress("");
     setServices([{ description: "", qty: "", unit: "", price: "", unitPrice: "" }]);
     setParts([{ description: "", qty: "", unit: "", price: "", unitPrice: "" }]);
@@ -489,6 +450,7 @@ function AdminDashboard() {
     setDateRelease(job.dateRelease || job.date_release || "");
     setAssignedTo(job.assignedTo || job.assigned_to || "");
     setStatus(job.status || "Pending");
+    setPaymentType(job.paymentType || job.payment_type || "Cash");
     setServices(normalizedServices);
     setParts(normalizedParts);
     setSubtotal(parseFloat(job.subtotal || 0));
@@ -499,7 +461,17 @@ function AdminDashboard() {
 
   // PRODUCT STATES
   const [showModal, setShowModal] = useState(false);
-  const [newProduct, setNewProduct] = useState({ code: "", partNumber: "", name: "", quantity: "", price: "", srp: "", companyCodename: "" });
+  const [newProduct, setNewProduct] = useState({
+    code: "",
+    partNumber: "",
+    name: "",
+    quantity: "",
+    price: "",
+    srpPrivate: "",
+    srpLgu: "",
+    srpStan: "",
+    companyCodename: ""
+  });
   const [editProductId, setEditProductId] = useState(null);
   const [isEditModal, setIsEditModal] = useState(false);
 
@@ -523,6 +495,9 @@ function AdminDashboard() {
         name: newProduct.name,
         quantity: parseInt(newProduct.quantity),
         price: parseFloat(newProduct.price),
+        srpPrivate: parseFloat(newProduct.srpPrivate || 0),
+        srpLgu: parseFloat(newProduct.srpLgu || 0),
+        srpStan: parseFloat(newProduct.srpStan || 0),
         companyCodename: newProduct.companyCodename,
         code: newProduct.code,
         partNumber: newProduct.partNumber
@@ -530,7 +505,17 @@ function AdminDashboard() {
 
       if (result.success) {
         await loadData();
-        setNewProduct({ code: "", partNumber: "", name: "", quantity: "", price: "", srp: "", companyCodename: "" });
+        setNewProduct({
+          code: "",
+          partNumber: "",
+          name: "",
+          quantity: "",
+          price: "",
+          srpPrivate: "",
+          srpLgu: "",
+          srpStan: "",
+          companyCodename: ""
+        });
         setShowModal(false);
       } else {
         alert(result.error || 'Failed to add product');
@@ -546,7 +531,17 @@ function AdminDashboard() {
     if (!p) return;
     setEditProductId(productId);
     setIsEditModal(true);
-    setNewProduct({ code: p.code, partNumber: p.part_number || p.partNumber || "", name: p.name, quantity: p.stocks, price: p.price, srp: p.srp, companyCodename: p.company_codename });
+    setNewProduct({
+      code: p.code,
+      partNumber: p.part_number || p.partNumber || "",
+      name: p.name,
+      quantity: p.stocks,
+      price: p.price,
+      srpPrivate: p.srp_private ?? "",
+      srpLgu: p.srp_lgu ?? "",
+      srpStan: p.srp_stan ?? "",
+      companyCodename: p.company_codename
+    });
   };
 
   const handleSaveEdit = async () => {
@@ -559,6 +554,9 @@ function AdminDashboard() {
         name: newProduct.name,
         quantity: parseInt(newProduct.quantity),
         price: parseFloat(newProduct.price),
+        srpPrivate: parseFloat(newProduct.srpPrivate || 0),
+        srpLgu: parseFloat(newProduct.srpLgu || 0),
+        srpStan: parseFloat(newProduct.srpStan || 0),
         companyCodename: newProduct.companyCodename,
         partNumber: newProduct.partNumber
       });
@@ -567,7 +565,17 @@ function AdminDashboard() {
         await loadData();
         setIsEditModal(false);
         setEditProductId(null);
-        setNewProduct({ code: "", partNumber: "", name: "", quantity: "", price: "", srp: "", companyCodename: "" });
+        setNewProduct({
+          code: "",
+          partNumber: "",
+          name: "",
+          quantity: "",
+          price: "",
+          srpPrivate: "",
+          srpLgu: "",
+          srpStan: "",
+          companyCodename: ""
+        });
       } else {
         alert(result.error || 'Failed to update product');
       }
@@ -641,7 +649,7 @@ function AdminDashboard() {
     ]));
 
     const partsRows = jobData.parts.map(p => ([
-      { text: p.description, fontSize: 10 },
+      { text: String(p.description || "").replace(/^[^-]+-\s*/, ""), fontSize: 10 },
       { text: p.qty, alignment: "center", fontSize: 10 },
       { text: p.unit || "", alignment: "center", fontSize: 10 },
       { text: Number(p.price).toFixed(2), alignment: "right", fontSize: 10 },
@@ -807,7 +815,6 @@ function AdminDashboard() {
             <button className={activeTab === "dashboard" ? "active" : ""} onClick={() => setActiveTab("dashboard")}>Dashboard</button>
             <button className={activeTab === "inventory" ? "active" : ""} onClick={() => setActiveTab("inventory")}>Inventory</button>
             <button className={activeTab === "jobs" ? "active" : ""} onClick={() => setActiveTab("jobs")}>Job Orders</button>
-            <button className={activeTab === "sales" ? "active" : ""} onClick={() => setActiveTab("sales")}>Sales</button>
             <button className="logout" onClick={handleLogout}>Logout</button>
           </nav>
         </div>
@@ -844,7 +851,20 @@ function AdminDashboard() {
           <>
             <div className="inventory-header">
               <h2>Inventory Management</h2>
-              <button className="add-product-btn" onClick={() => { setNewProduct({ code: "", partNumber: "", name: "", quantity: "", price: "", srp: "", companyCodename: "" }); setShowModal(true); }}>Add Product</button>
+              <button className="add-product-btn" onClick={() => {
+                setNewProduct({
+                  code: "",
+                  partNumber: "",
+                  name: "",
+                  quantity: "",
+                  price: "",
+                  srpPrivate: "",
+                  srpLgu: "",
+                  srpStan: "",
+                  companyCodename: ""
+                });
+                setShowModal(true);
+              }}>Add Product</button>
             </div>
             <div className="inventory-search">
               <input
@@ -888,9 +908,9 @@ function AdminDashboard() {
                         </span>
                       </td>
                       <td>₱{parseFloat(p.price).toFixed(2)}</td>
-                      <td>₱{(parseFloat(p.price || 0) * 1.25 * 1.12).toFixed(2)}</td>
-                      <td>₱{(parseFloat(p.price || 0) * 1.60 * 1.12).toFixed(2)}</td>
-                      <td>₱{(parseFloat(p.price || 0) * 1.30 * 1.12).toFixed(2)}</td>
+                      <td>₱{parseFloat(p.srp_private || 0).toFixed(2)}</td>
+                      <td>₱{parseFloat(p.srp_lgu || 0).toFixed(2)}</td>
+                      <td>₱{parseFloat(p.srp_stan || 0).toFixed(2)}</td>
                       <td>
                         <button className="edit-btn" onClick={() => openEditModal(p.id)}>Edit</button>
                         <button className="delete-btn" onClick={() => handleDeleteProduct(p.id)}>Delete</button>
@@ -963,96 +983,12 @@ function AdminDashboard() {
                           <button className="view-edit-btn" onClick={() => handleEditJob(o.id)}>
                             {o.status === "Completed" ? "View/Print" : "Edit"}
                           </button>
-                          <button className="delete-btn" onClick={() => handleDeleteJobOrder(o.id)} style={{ marginLeft: 8 }}>Delete</button>
+                          {o.status !== "Completed" && (
+                            <button className="delete-btn" onClick={() => handleDeleteJobOrder(o.id)} style={{ marginLeft: 8 }}>Delete</button>
+                          )}
                         </td>
                       </tr>
                     ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {activeTab === "sales" && (
-          <div className="sales-section">
-            <h2>Sales Management</h2>
-            <div className="sales-cards">
-              <div className="sales-card">
-                <h4>Daily Summary Report</h4>
-                <p>Total Sales: ₱{dailySales.toFixed(2)}</p>
-                <p>Total Profit: ₱{dailyProfit.toFixed(2)}</p>
-              </div>
-              <div className="sales-card">
-                <h4>View Sales by Date</h4>
-                <input type="date" value={salesDate} onChange={(e) => setSalesDate(e.target.value)} />
-                <p>Showing sales for: {salesDate || "-"}</p>
-                <p>Total Sales: ₱{totalSalesByDate.toFixed(2)}</p>
-                <p>Total Profit: ₱{totalProfitByDate.toFixed(2)}</p>
-              </div>
-              <div className="sales-card">
-                <h4>Sales by Date Range</h4>
-                <div className="sales-range">
-                  <label>Start:</label>
-                  <input type="date" value={salesStartDate} onChange={(e) => setSalesStartDate(e.target.value)} />
-                  <label>End:</label>
-                  <input type="date" value={salesEndDate} onChange={(e) => setSalesEndDate(e.target.value)} />
-                </div>
-                <p>Total: ₱{totalSalesByRange.toFixed(2)}</p>
-                <p>Total Profit: ₱{totalProfitByRange.toFixed(2)}</p>
-              </div>
-            </div>
-
-            <div className="sales-log-header">
-              <h3>Sales Log</h3>
-              <div className="sales-log-actions">
-                <div className="sales-filter">
-                  <label>Date:</label>
-                  <input type="date" value={salesLogDate} onChange={(e) => setSalesLogDate(e.target.value)} />
-                </div>
-              </div>
-            </div>
-            <div className="sales-table-wrapper">
-              <table className="sales-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Job Order No.</th>
-                    <th>Vehicle / Plate No.</th>
-                    <th>Total Service (₱)</th>
-                    <th>Total Parts Price (₱)</th>
-                    <th>Unit Price (₱)</th>
-                    <th>Discount (₱)</th>
-                    <th>Total Amount (₱)</th>
-                    <th>Profit (₱)</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredSalesOrders.length === 0 ? (
-                    <tr><td colSpan="9" className="empty-message">No sales records yet.</td></tr>
-                  ) : (
-                    filteredSalesOrders.map((o) => {
-                      const totals = computeOrderTotals(o);
-                      return (
-                        <tr key={`sales-${o.id}`}>
-                          <td>{toDateKey(getOrderDate(o)) || "-"}</td>
-                          <td>{formatJobOrderNo(o.joNumber || o.job_order_no)}</td>
-                          <td>{o.vehicleModel || o.model || "-"} / {o.plate || o.plate_no || "-"}</td>
-                          <td>₱{totals.totalLabor.toFixed(2)}</td>
-                          <td>₱{totals.totalPartsPrice.toFixed(2)}</td>
-                          <td>₱{totals.unitPriceTotal.toFixed(2)}</td>
-                          <td>₱{totals.discountValue.toFixed(2)}</td>
-                          <td>₱{totals.totalAmount.toFixed(2)}</td>
-                          <td>₱{totals.profit.toFixed(2)}</td>
-                          <td>
-                            <span className={o.status === "Pending" ? "status-tag yellow" : o.status === "In Progress" ? "status-tag blue" : "status-tag green"}>
-                              {o.status}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })
                   )}
                 </tbody>
               </table>
@@ -1086,14 +1022,12 @@ function AdminDashboard() {
                     <input type="text" placeholder="Enter vehicle model" value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} disabled={isJobReadOnly} />
                     <label>Date In</label>
                     <input type="date" value={dateIn} onChange={(e) => setDateIn(e.target.value)} disabled={isJobReadOnly} />
-                    <label>Assigned To</label>
-                    <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} disabled={isJobReadOnly}>
-                      <option value="">Select</option>
-                      <option value="Technician A">Technician A</option>
-                      <option value="Technician B">Technician B</option>
-                      <option value="Technician C">Technician C</option>
-                      <option value="Mechanic 1">Mechanic 1</option>
-                      <option value="Mechanic 2">Mechanic 2</option>
+                    <label>Assigned To</label>                    
+                    <input type="text" placeholder="Enter mechanic" value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} disabled={isJobReadOnly} />
+                    <label>Payment Type</label>
+                    <select value={paymentType} onChange={(e) => setPaymentType(e.target.value)} disabled={isJobReadOnly}>
+                      <option value="Accounts Receivable">Accounts Receivalbe</option>
+                      <option value="Cash">Cash</option>
                     </select>
                   </div>
                   <div className="right">
@@ -1116,6 +1050,7 @@ function AdminDashboard() {
                       <option>In Progress</option>
                       <option>Completed</option>
                     </select>
+                    
                   </div>
                 </div>
 
@@ -1192,36 +1127,39 @@ function AdminDashboard() {
         )}
 
         {showModal && (
-          <div className="modal-container">
-            <div className="modal-box">
-              <h2>Add New Product</h2>
+          <div className="modal-container centered-modal">
+            <div className="modal-box product-modal">
+              <div className="product-modal-header">
+                <h2>Add New Product</h2>
+              </div>
+              <div className="product-modal-body">
+                <label>Code (Barcode)</label>
+                <input
+                  type="text"
+                  placeholder="Scan or enter code"
+                  value={newProduct.code}
+                  onChange={(e) => setNewProduct({ ...newProduct, code: e.target.value })}
+                  autoFocus
+                />
 
-              <label>Code (Barcode)</label>
-              <input
-                type="text"
-                placeholder="Scan or enter code"
-                value={newProduct.code}
-                onChange={(e) => setNewProduct({ ...newProduct, code: e.target.value })}
-                autoFocus
-              />
+                <label>Part Number</label>
+                <input
+                  type="text"
+                  placeholder="Enter part number"
+                  value={newProduct.partNumber}
+                  onChange={(e) => setNewProduct({ ...newProduct, partNumber: e.target.value })}
+                />
 
-              <label>Part Number</label>
-              <input
-                type="text"
-                placeholder="Enter part number"
-                value={newProduct.partNumber}
-                onChange={(e) => setNewProduct({ ...newProduct, partNumber: e.target.value })}
-              />
-
-              <label>Product Name</label>
-              <input type="text" placeholder="Enter Product Name" value={newProduct.name} onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })} />
-              <label>Company</label>
-              <input type="text" placeholder="Enter company name" value={newProduct.companyCodename} onChange={(e) => setNewProduct({ ...newProduct, companyCodename: e.target.value })} />
-              <label>Quantity</label>
-              <input type="number" placeholder="Enter Quantity" value={newProduct.quantity} onChange={(e) => setNewProduct({ ...newProduct, quantity: e.target.value })} />
-              <label>Unit Price</label>
-              <input type="number" placeholder="Enter Unit Price" step="0.01" value={newProduct.price} onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })} />
-              <div className="modal-actions">
+                <label>Product Name</label>
+                <input type="text" placeholder="Enter Product Name" value={newProduct.name} onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })} />
+                <label>Company</label>
+                <input type="text" placeholder="Enter company name" value={newProduct.companyCodename} onChange={(e) => setNewProduct({ ...newProduct, companyCodename: e.target.value })} />
+                <label>Quantity</label>
+                <input type="number" placeholder="Enter Quantity" value={newProduct.quantity} onChange={(e) => setNewProduct({ ...newProduct, quantity: e.target.value })} />
+                <label>Unit Price</label>
+                <input type="number" placeholder="Enter Unit Price" step="0.01" value={newProduct.price} onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })} />
+              </div>
+              <div className="product-modal-footer modal-actions">
                 <button className="cancel" onClick={() => setShowModal(false)}>Cancel</button>
                 <button className="save" disabled={!isFormValid()} onClick={handleAddProduct}>Save</button>
               </div>
@@ -1231,21 +1169,31 @@ function AdminDashboard() {
 
         {isEditModal && (
           <div className="modal-container">
-            <div className="modal-box">
-              <h2>Edit Product</h2>
-              <label>Code</label>
-              <input type="text" value={newProduct.code} onChange={(e) => setNewProduct({ ...newProduct, code: e.target.value })} />
-              <label>Part Number</label>
-              <input type="text" value={newProduct.partNumber} onChange={(e) => setNewProduct({ ...newProduct, partNumber: e.target.value })} />
-              <label>Product Name</label>
-              <input type="text" value={newProduct.name} onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })} />
-              <label>Company</label>
-              <input type="text" value={newProduct.companyCodename} onChange={(e) => setNewProduct({ ...newProduct, companyCodename: e.target.value })} />
-              <label>Quantity</label>
-              <input type="number" value={newProduct.quantity} onChange={(e) => setNewProduct({ ...newProduct, quantity: e.target.value })} />
-              <label>Unit Price</label>
-              <input type="number" step="0.01" value={newProduct.price} onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })} />
-              <div className="modal-actions">
+            <div className="modal-box product-modal">
+              <div className="product-modal-header">
+                <h2>Edit Product</h2>
+              </div>
+              <div className="product-modal-body">
+                <label>Code</label>
+                <input type="text" value={newProduct.code} onChange={(e) => setNewProduct({ ...newProduct, code: e.target.value })} />
+                <label>Part Number</label>
+                <input type="text" value={newProduct.partNumber} onChange={(e) => setNewProduct({ ...newProduct, partNumber: e.target.value })} />
+                <label>Product Name</label>
+                <input type="text" value={newProduct.name} onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })} />
+                <label>Company</label>
+                <input type="text" value={newProduct.companyCodename} onChange={(e) => setNewProduct({ ...newProduct, companyCodename: e.target.value })} />
+                <label>Quantity</label>
+                <input type="number" value={newProduct.quantity} onChange={(e) => setNewProduct({ ...newProduct, quantity: e.target.value })} />
+                <label>Unit Price</label>
+                <input type="number" step="0.01" value={newProduct.price} onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })} />
+                <label>Private SRP</label>
+                <input type="number" step="0.01" value={newProduct.srpPrivate} onChange={(e) => setNewProduct({ ...newProduct, srpPrivate: e.target.value })} />
+                <label>LGU SRP</label>
+                <input type="number" step="0.01" value={newProduct.srpLgu} onChange={(e) => setNewProduct({ ...newProduct, srpLgu: e.target.value })} />
+                <label>STAN SRP</label>
+                <input type="number" step="0.01" value={newProduct.srpStan} onChange={(e) => setNewProduct({ ...newProduct, srpStan: e.target.value })} />
+              </div>
+              <div className="product-modal-footer modal-actions">
                 <button className="cancel" onClick={() => { setIsEditModal(false); setEditProductId(null); }}>Cancel</button>
                 <button className="save" disabled={!isFormValid()} onClick={handleSaveEdit}>Save Changes</button>
               </div>

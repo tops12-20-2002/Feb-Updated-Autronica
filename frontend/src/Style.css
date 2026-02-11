@@ -337,14 +337,81 @@
 }
 
 .RoleButton.mechanic {
-  background: #ffdd33;
-  color: #0247d5;
-  box-shadow: 0 6px 0 #d4af37;
+  background: #4a4b4a;
+  color: #ffdd33;
+  box-shadow: 0 6px 0 #292928;
 }
 
 .RoleButton:hover {
   transform: translateY(-3px);
   box-shadow: 0 8px 0 rgba(0, 0, 0, 0.15);
+}
+
+.RolePasswordOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+}
+
+.RolePasswordModal {
+  width: min(420px, 92vw);
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.25);
+  padding: 1.4rem 1.2rem 1.1rem;
+}
+
+.RolePasswordModal h3 {
+  margin: 0;
+  color: #0247d5;
+}
+
+.RolePasswordModal p {
+  margin: 0.45rem 0 1rem;
+  color: #6b7280;
+}
+
+.RolePasswordModal input {
+  width: 95%;
+  margin: 0;
+}
+
+.RolePasswordInputRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.RolePasswordInputRow input {
+  width: auto;
+  flex: 1;
+}
+
+.RolePasswordToggle {
+  border: 1px solid #c8d3f1;
+  background: #eef3ff;
+  color: #0247d5;
+  border-radius: 8px;
+  padding: 0.55rem 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.RolePasswordError {
+  color: #d90429;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}
+
+.RolePasswordActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1rem;
 }
 
 /* --- Layout --- */
@@ -643,34 +710,75 @@
   background: rgba(0,0,0,0.5);
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 24px 12px;
   z-index: 2000;
+}
+
+.modal-container.centered-modal {
+  align-items: center;
 }
 
 /* Popup Box */
 .modal-box {
   background: white;
-  padding: 35px;
-  width: 600px;
+  width: min(600px, 94vw);
+  max-height: calc(100vh - 48px);
   border-radius: 16px;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+  border: 1px solid #e8ebf2;
 }
 
-.modal-box input {
-  width: 95.5%;
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid #ccc;
-  background: #f5f5f5;
+.product-modal-header {
+  padding: 20px 24px 10px;
+  border-bottom: 1px solid #eef0f4;
+}
+
+.product-modal-header h2 {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 650;
+  color: #111827;
+}
+
+.product-modal-body {
+  padding: 14px 24px 10px;
+  overflow-y: auto;
+}
+
+.product-modal-body label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.product-modal-body input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #d4d9e2;
+  background: #f8fafc;
+  margin-bottom: 14px;
 }
 
 .modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 15px;
-  margin-top: 20px;
+  gap: 12px;
+  margin-top: 0;
+}
+
+.product-modal-footer {
+  padding: 14px 24px 18px;
+  border-top: 1px solid #eef0f4;
+  background: #fff;
 }
 
 .modal-actions .cancel {

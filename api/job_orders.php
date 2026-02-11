@@ -10,6 +10,21 @@ requireAuth();
 
 $method = $_SERVER['REQUEST_METHOD'];
 
+function ensurePaymentTypeColumn($pdo) {
+    $stmt = $pdo->query("SHOW COLUMNS FROM job_orders LIKE 'payment_type'");
+    $exists = $stmt->fetch();
+    if (!$exists) {
+        $pdo->exec("ALTER TABLE job_orders ADD COLUMN payment_type VARCHAR(40) NOT NULL DEFAULT 'Cash' AFTER status");
+    }
+}
+
+function normalizePaymentType($value) {
+    $raw = trim((string)($value ?? ''));
+    if ($raw === 'Accounts Receivable') return 'Accounts Receivable';
+    if ($raw === 'Cash') return 'Cash';
+    return 'Cash';
+}
+
 function parseInventoryCodeFromDescription($description) {
     $desc = trim($description ?? '');
     if ($desc === '') return '';
@@ -62,6 +77,8 @@ function deductInventoryForParts($pdo, $parts) {
 }
 
 try {
+    ensurePaymentTypeColumn($pdo);
+
     switch ($method) {
         case 'GET':
             // Get all job orders with services and parts
@@ -120,6 +137,7 @@ try {
                 $order['dateIn'] = $order['date'];
                 $order['customerType'] = $order['type'];
                 $order['total'] = $order['total_amount'];
+                $order['paymentType'] = $order['payment_type'] ?? 'Cash';
             }
             
             sendSuccess($orders);
@@ -152,6 +170,7 @@ try {
             $dateRelease = $data['dateRelease'] ?? $data['date_release'] ?? null;
             $assignedTo = trim($data['assignedTo'] ?? $data['assigned_to'] ?? '');
             $status = $data['status'] ?? 'Pending';
+            $paymentType = normalizePaymentType($data['paymentType'] ?? $data['payment_type'] ?? 'Cash');
             $services = $data['services'] ?? [];
             $parts = $data['parts'] ?? [];
             $subtotal = floatval($data['subtotal'] ?? 0);
@@ -167,8 +186,8 @@ try {
             
             try {
                 // Insert job order
-                $stmt = $pdo->prepare("INSERT INTO job_orders (job_order_no, type, customer_name, address, contact_no, model, plate_no, date, date_release, assigned_to, status, subtotal, discount, total_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                $stmt->execute([$jobOrderNo, $customerType, $clientName, $address, $contactNo, $vehicleModel, $plateNo, $dateIn, $dateRelease, $assignedTo, $status, $subtotal, $discount, $total]);
+                $stmt = $pdo->prepare("INSERT INTO job_orders (job_order_no, type, customer_name, address, contact_no, model, plate_no, date, date_release, assigned_to, status, payment_type, subtotal, discount, total_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$jobOrderNo, $customerType, $clientName, $address, $contactNo, $vehicleModel, $plateNo, $dateIn, $dateRelease, $assignedTo, $status, $paymentType, $subtotal, $discount, $total]);
                 
                 $jobOrderId = $pdo->lastInsertId();
                 
@@ -248,6 +267,7 @@ try {
             $dateRelease = $data['dateRelease'] ?? $data['date_release'] ?? null;
             $assignedTo = trim($data['assignedTo'] ?? $data['assigned_to'] ?? '');
             $status = $data['status'] ?? 'Pending';
+            $paymentType = normalizePaymentType($data['paymentType'] ?? $data['payment_type'] ?? 'Cash');
             $services = $data['services'] ?? [];
             $parts = $data['parts'] ?? [];
             $subtotal = floatval($data['subtotal'] ?? 0);
@@ -264,8 +284,8 @@ try {
                 $prevStatus = $stmt->fetchColumn();
 
                 // Update job order
-                $stmt = $pdo->prepare("UPDATE job_orders SET job_order_no = ?, type = ?, customer_name = ?, address = ?, contact_no = ?, model = ?, plate_no = ?, date = ?, date_release = ?, assigned_to = ?, status = ?, subtotal = ?, discount = ?, total_amount = ? WHERE id = ?");
-                $stmt->execute([$jobOrderNo, $customerType, $clientName, $address, $contactNo, $vehicleModel, $plateNo, $dateIn, $dateRelease, $assignedTo, $status, $subtotal, $discount, $total, $id]);
+                $stmt = $pdo->prepare("UPDATE job_orders SET job_order_no = ?, type = ?, customer_name = ?, address = ?, contact_no = ?, model = ?, plate_no = ?, date = ?, date_release = ?, assigned_to = ?, status = ?, payment_type = ?, subtotal = ?, discount = ?, total_amount = ? WHERE id = ?");
+                $stmt->execute([$jobOrderNo, $customerType, $clientName, $address, $contactNo, $vehicleModel, $plateNo, $dateIn, $dateRelease, $assignedTo, $status, $paymentType, $subtotal, $discount, $total, $id]);
                 
                 // Delete old services and parts (cascade will handle this, but we'll do it explicitly)
                 $stmt = $pdo->prepare("DELETE FROM job_order_services WHERE job_order_id = ?");
