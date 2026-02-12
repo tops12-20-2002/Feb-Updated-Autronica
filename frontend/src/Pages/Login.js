@@ -89,10 +89,6 @@ function Login() {
             </label>
 
             <div className="FormRow">
-              <label className="CheckRow">
-                <input type="checkbox" />
-                <span>Remember me</span>
-              </label>
               <Link className="HighlightLink" to="/forgot-password">
                 Forgot Password
               </Link>

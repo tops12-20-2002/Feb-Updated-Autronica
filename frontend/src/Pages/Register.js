@@ -79,7 +79,7 @@ function Register() {
             />
           </label>
 
-          <label className="Field">
+          <label className="Field RegisterPasswordField">
             <span className="FieldLabel">Password</span>
             <input
               className="TextInput"
@@ -91,8 +91,8 @@ function Register() {
               minLength={8}
             />
           </label>
-          <div className="FormRow">
-            <span style={{ fontSize: '12px', color: '#666' }}>Must be at least 8 characters</span>
+          <div className="RegisterPasswordHint">
+            <span>Must be at least 8 characters</span>
           </div>
 
           <label className="Field">
@@ -139,4 +139,3 @@ function Register() {
 }
 
 export default Register;
-

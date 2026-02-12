@@ -76,6 +76,20 @@ function deductInventoryForParts($pdo, $parts) {
     }
 }
 
+function getNextCompletedJobOrderNo($pdo) {
+    $stmt = $pdo->query("SELECT COALESCE(MAX(job_order_no), 0) + 1 FROM job_orders WHERE status = 'Completed'");
+    return intval($stmt->fetchColumn());
+}
+
+function compactCompletedJobOrderNumbers($pdo, $fromNumber) {
+    $stmt = $pdo->prepare("
+        UPDATE job_orders
+        SET job_order_no = job_order_no - 1
+        WHERE status = 'Completed' AND job_order_no > ?
+    ");
+    $stmt->execute([intval($fromNumber)]);
+}
+
 try {
     ensurePaymentTypeColumn($pdo);
 
@@ -94,8 +108,17 @@ try {
                 $stmt->execute([$jobOrderNo]);
                 $orders = $stmt->fetchAll();
             } else {
-                $stmt = $pdo->query("SELECT * FROM job_orders ORDER BY job_order_no DESC, id DESC");
+                $stmt = $pdo->query("SELECT * FROM job_orders ORDER BY id DESC");
                 $orders = $stmt->fetchAll();
+            }
+
+            // Build stable display numbers for completed orders (0001, 0002, ...)
+            $completedNumberById = [];
+            $stmt = $pdo->query("SELECT id FROM job_orders WHERE status = 'Completed' ORDER BY id ASC");
+            $completedIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            $seq = 1;
+            foreach ($completedIds as $completedId) {
+                $completedNumberById[intval($completedId)] = $seq++;
             }
             
             // Get services and parts for each job order
@@ -129,7 +152,9 @@ try {
                 }, $parts);
                 
                 // Map to frontend structure
-                $order['joNumber'] = $order['job_order_no'];
+                $order['joNumber'] = $order['status'] === 'Completed'
+                    ? intval($completedNumberById[intval($order['id'])] ?? 0)
+                    : 0;
                 $order['client'] = $order['customer_name'];
                 $order['vehicleModel'] = $order['model'];
                 $order['plate'] = $order['plate_no'];
@@ -146,19 +171,6 @@ try {
         case 'POST':
             // Create new job order with services and parts
             $data = json_decode(file_get_contents('php://input'), true);
-            
-            // Get next job order number if not provided
-            $jobOrderNo = intval($data['joNumber'] ?? $data['job_order_no'] ?? 0);
-            // Get next job order number if not provided
-            if (isset($data['joNumber']) && $data['joNumber'] !== '') {
-                $jobOrderNo = intval($data['joNumber']); // use what frontend sent
-            } else {
-                // Auto-generate next number
-                $stmt = $pdo->query("SELECT MAX(job_order_no) as max_no FROM job_orders");
-                $result = $stmt->fetch();
-                $jobOrderNo = ($result['max_no'] ?? -1) + 1; // start from 0 if empty
-            }
-
             
             $customerType = $data['customerType'] ?? $data['type'] ?? 'Private';
             $clientName = trim($data['client'] ?? $data['customer_name'] ?? '');
@@ -185,6 +197,10 @@ try {
             $pdo->beginTransaction();
             
             try {
+                $jobOrderNo = $status === 'Completed'
+                    ? getNextCompletedJobOrderNo($pdo)
+                    : 0;
+
                 // Insert job order
                 $stmt = $pdo->prepare("INSERT INTO job_orders (job_order_no, type, customer_name, address, contact_no, model, plate_no, date, date_release, assigned_to, status, payment_type, subtotal, discount, total_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 $stmt->execute([$jobOrderNo, $customerType, $clientName, $address, $contactNo, $vehicleModel, $plateNo, $dateIn, $dateRelease, $assignedTo, $status, $paymentType, $subtotal, $discount, $total]);
@@ -256,7 +272,6 @@ try {
                 sendValidationError('Invalid job order ID');
             }
             
-            $jobOrderNo = intval($data['joNumber'] ?? $data['job_order_no'] ?? 0);
             $customerType = $data['customerType'] ?? $data['type'] ?? 'Private';
             $clientName = trim($data['client'] ?? $data['customer_name'] ?? '');
             $address = trim($data['address'] ?? '');
@@ -278,10 +293,24 @@ try {
             $pdo->beginTransaction();
             
             try {
-                // Check previous status to avoid double deduction
-                $stmt = $pdo->prepare("SELECT status FROM job_orders WHERE id = ?");
+                // Check previous status and number to handle numbering transitions
+                $stmt = $pdo->prepare("SELECT status, job_order_no FROM job_orders WHERE id = ?");
                 $stmt->execute([$id]);
-                $prevStatus = $stmt->fetchColumn();
+                $prevRow = $stmt->fetch();
+                $prevStatus = $prevRow['status'] ?? 'Pending';
+                $prevJobOrderNo = intval($prevRow['job_order_no'] ?? 0);
+
+                $jobOrderNo = 0;
+                if ($status === 'Completed') {
+                    if ($prevStatus === 'Completed' && $prevJobOrderNo > 0) {
+                        $jobOrderNo = $prevJobOrderNo; // keep existing completed number
+                    } else {
+                        $jobOrderNo = getNextCompletedJobOrderNo($pdo);
+                    }
+                } elseif ($prevStatus === 'Completed' && $prevJobOrderNo > 0) {
+                    // If reverting from completed, close the numbering gap.
+                    compactCompletedJobOrderNumbers($pdo, $prevJobOrderNo);
+                }
 
                 // Update job order
                 $stmt = $pdo->prepare("UPDATE job_orders SET job_order_no = ?, type = ?, customer_name = ?, address = ?, contact_no = ?, model = ?, plate_no = ?, date = ?, date_release = ?, assigned_to = ?, status = ?, payment_type = ?, subtotal = ?, discount = ?, total_amount = ? WHERE id = ?");
@@ -351,28 +380,44 @@ try {
             break;
             
         case 'DELETE':
-    $data = json_decode(file_get_contents('php://input'), true);
-    $id = intval($data['id'] ?? 0);
+            $data = json_decode(file_get_contents('php://input'), true);
+            $id = intval($data['id'] ?? 0);
 
-    if ($id <= 0) {
-        sendValidationError('Invalid job order ID');
-    }
+            if ($id <= 0) {
+                sendValidationError('Invalid job order ID');
+            }
 
-    // Get deleted job order number
-    $stmt = $pdo->prepare("SELECT job_order_no FROM job_orders WHERE id = ?");
-    $stmt->execute([$id]);
-    $deletedNumber = $stmt->fetchColumn();
+            $pdo->beginTransaction();
 
-    // Delete the job order
-    $stmt = $pdo->prepare("DELETE FROM job_orders WHERE id = ?");
-    $stmt->execute([$id]);
+            try {
+                // Get status and number before delete
+                $stmt = $pdo->prepare("SELECT status, job_order_no FROM job_orders WHERE id = ?");
+                $stmt->execute([$id]);
+                $row = $stmt->fetch();
 
-    // Shift down all job orders with higher numbers
-    $stmt = $pdo->prepare("UPDATE job_orders SET job_order_no = job_order_no - 1 WHERE job_order_no > ?");
-    $stmt->execute([$deletedNumber]);
+                if (!$row) {
+                    throw new Exception('Job order not found');
+                }
 
-    sendSuccess(null, 'Job order deleted and numbers shifted successfully');
-    break;
+                $deletedStatus = $row['status'] ?? 'Pending';
+                $deletedNumber = intval($row['job_order_no'] ?? 0);
+
+                // Delete the job order
+                $stmt = $pdo->prepare("DELETE FROM job_orders WHERE id = ?");
+                $stmt->execute([$id]);
+
+                // Only completed numbers are sequential and need compaction
+                if ($deletedStatus === 'Completed' && $deletedNumber > 0) {
+                    compactCompletedJobOrderNumbers($pdo, $deletedNumber);
+                }
+
+                $pdo->commit();
+                sendSuccess(null, 'Job order deleted successfully');
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                throw $e;
+            }
+            break;
 
             
         default:

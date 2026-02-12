@@ -17,7 +17,17 @@ function MechanicDashboard() {
   const [salesDate, setSalesDate] = useState("");
   const [salesStartDate, setSalesStartDate] = useState("");
   const [salesEndDate, setSalesEndDate] = useState("");
+  const [arCashDate, setArCashDate] = useState("");
+  const [arCashStartDate, setArCashStartDate] = useState("");
+  const [arCashEndDate, setArCashEndDate] = useState("");
   const [salesLogDate, setSalesLogDate] = useState("");
+  const [salesLogStartDate, setSalesLogStartDate] = useState("");
+  const [salesLogEndDate, setSalesLogEndDate] = useState("");
+  const [salesLogPaymentType, setSalesLogPaymentType] = useState("");
+  const [salesSearch, setSalesSearch] = useState("");
+  const [dailyPaymentView, setDailyPaymentView] = useState("Accounts Receivable");
+  const [datePaymentView, setDatePaymentView] = useState("Accounts Receivable");
+  const [rangePaymentView, setRangePaymentView] = useState("Accounts Receivable");
 
   useEffect(() => {
     loadData();
@@ -193,12 +203,89 @@ function MechanicDashboard() {
 
   const totalSalesByRange = salesByRange.reduce((sum, o) => sum + computeOrderTotals(o).totalAmount, 0);
   const totalProfitByRange = salesByRange.reduce((sum, o) => sum + computeOrderTotals(o).profit, 0);
-  const dateByPaymentType = summarizeByPaymentType(salesByDate);
-  const rangeByPaymentType = summarizeByPaymentType(salesByRange);
+  const arCashByDate = arCashDate
+    ? completedOrders.filter((o) => toDateKey(getOrderDate(o)) === arCashDate)
+    : [];
 
-  const filteredSalesOrders = salesLogDate
-    ? completedOrders.filter((o) => toDateKey(getOrderDate(o)) === salesLogDate)
-    : completedOrders;
+  const arCashByRange = arCashStartDate && arCashEndDate
+    ? completedOrders.filter((o) => {
+        const key = toDateKey(getOrderDate(o));
+        return key >= arCashStartDate && key <= arCashEndDate;
+      })
+    : [];
+
+  const dateByPaymentType = summarizeByPaymentType(arCashByDate);
+  const rangeByPaymentType = summarizeByPaymentType(arCashByRange);
+
+  const filteredSalesOrders = salesLogStartDate && salesLogEndDate
+    ? completedOrders.filter((o) => {
+        const key = toDateKey(getOrderDate(o));
+        return key >= salesLogStartDate && key <= salesLogEndDate;
+      })
+    : salesLogDate
+      ? completedOrders.filter((o) => toDateKey(getOrderDate(o)) === salesLogDate)
+      : completedOrders;
+
+  const paymentFilteredSalesOrders = salesLogPaymentType
+    ? filteredSalesOrders.filter((o) => getPaymentType(o) === salesLogPaymentType)
+    : filteredSalesOrders;
+
+  const searchedSalesOrders = salesSearch.trim()
+    ? paymentFilteredSalesOrders.filter((o) => {
+        const query = salesSearch.trim().toLowerCase();
+        const haystack = [
+          toDateKey(getOrderDate(o)) || "",
+          formatJobOrderNo(o.joNumber ?? o.job_order_no ?? 0),
+          o.vehicleModel || o.model || "",
+          o.plate || o.plate_no || "",
+          o.client || o.customer_name || "",
+          getPaymentType(o),
+          o.status || "",
+        ]
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(query);
+      })
+    : paymentFilteredSalesOrders;
+
+  const handleDatePaymentViewChange = (nextPaymentView) => {
+    setDatePaymentView(nextPaymentView);
+    if (arCashDate) {
+      setSalesLogDate(arCashDate);
+      setSalesLogStartDate("");
+      setSalesLogEndDate("");
+      setSalesLogPaymentType(nextPaymentView);
+    }
+  };
+
+  const handleRangePaymentViewChange = (nextPaymentView) => {
+    setRangePaymentView(nextPaymentView);
+    if (arCashStartDate && arCashEndDate) {
+      setSalesLogDate("");
+      setSalesLogStartDate(arCashStartDate);
+      setSalesLogEndDate(arCashEndDate);
+      setSalesLogPaymentType(nextPaymentView);
+    }
+  };
+
+  const renderPaymentToggle = (value, onChange) => (
+    <div className="payment-toggle" role="tablist" aria-label="Payment type toggle">
+      <button
+        type="button"
+        className={`payment-toggle-btn ${value === "Accounts Receivable" ? "active" : ""}`}
+        onClick={() => onChange("Accounts Receivable")}
+      >
+        AR
+      </button>
+      <button
+        type="button"
+        className={`payment-toggle-btn ${value === "Cash" ? "active" : ""}`}
+        onClick={() => onChange("Cash")}
+      >
+        Cash
+      </button>
+    </div>
+  );
 
   if (loading) {
     return <div style={{ padding: "40px", textAlign: "center" }}>Loading...</div>;
@@ -229,7 +316,18 @@ function MechanicDashboard() {
             </div>
             <div className="sales-card">
               <h4>View Sales by Date</h4>
-              <input type="date" value={salesDate} onChange={(e) => setSalesDate(e.target.value)} />
+              <input
+                type="date"
+                value={salesDate}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setSalesDate(value);
+                  setSalesLogDate(value);
+                  setSalesLogStartDate("");
+                  setSalesLogEndDate("");
+                  setSalesLogPaymentType("");
+                }}
+              />
               <p>Showing sales for: {salesDate || "-"}</p>
               <p>Total Sales: ₱{totalSalesByDate.toFixed(2)}</p>
               <p>Total Profit: ₱{totalProfitByDate.toFixed(2)}</p>
@@ -238,41 +336,126 @@ function MechanicDashboard() {
               <h4>Sales by Date Range</h4>
               <div className="sales-range">
                 <label>Start:</label>
-                <input type="date" value={salesStartDate} onChange={(e) => setSalesStartDate(e.target.value)} />
+                <input
+                  type="date"
+                  value={salesStartDate}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSalesStartDate(value);
+                    setSalesLogDate("");
+                    setSalesLogStartDate(value);
+                    setSalesLogEndDate(salesEndDate);
+                    setSalesLogPaymentType("");
+                  }}
+                />
                 <label>End:</label>
-                <input type="date" value={salesEndDate} onChange={(e) => setSalesEndDate(e.target.value)} />
+                <input
+                  type="date"
+                  value={salesEndDate}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSalesEndDate(value);
+                    setSalesLogDate("");
+                    setSalesLogStartDate(salesStartDate);
+                    setSalesLogEndDate(value);
+                    setSalesLogPaymentType("");
+                  }}
+                />
               </div>
               <p>Total: ₱{totalSalesByRange.toFixed(2)}</p>
               <p>Total Profit: ₱{totalProfitByRange.toFixed(2)}</p>
             </div>
             <div className="sales-card">
-              <h4>Daily AR / Cash</h4>
-              <p>AR Sales: PHP {dailyByPaymentType.arSales.toFixed(2)}</p>
-              <p>AR Profit: PHP {dailyByPaymentType.arProfit.toFixed(2)}</p>
-              <p>Cash Sales: PHP {dailyByPaymentType.cashSales.toFixed(2)}</p>
-              <p>Cash Profit: PHP {dailyByPaymentType.cashProfit.toFixed(2)}</p>
+              <div className="sales-card-header">
+                <h4>Daily AR / Cash</h4>
+                {renderPaymentToggle(dailyPaymentView, setDailyPaymentView)}
+              </div>
+              {dailyPaymentView === "Accounts Receivable" ? (
+                <>
+                  <p>AR Sales: PHP {dailyByPaymentType.arSales.toFixed(2)}</p>
+                  <p>AR Profit: PHP {dailyByPaymentType.arProfit.toFixed(2)}</p>
+                </>
+              ) : (
+                <>
+                  <p>Cash Sales: PHP {dailyByPaymentType.cashSales.toFixed(2)}</p>
+                  <p>Cash Profit: PHP {dailyByPaymentType.cashProfit.toFixed(2)}</p>
+                </>
+              )}
             </div>
             <div className="sales-card">
-              <h4>AR / Cash by Date</h4>
-              <input type="date" value={salesDate} onChange={(e) => setSalesDate(e.target.value)} />
-              <p>Showing for: {salesDate || "-"}</p>
-              <p>AR Sales: PHP {dateByPaymentType.arSales.toFixed(2)}</p>
-              <p>AR Profit: PHP {dateByPaymentType.arProfit.toFixed(2)}</p>
-              <p>Cash Sales: PHP {dateByPaymentType.cashSales.toFixed(2)}</p>
-              <p>Cash Profit: PHP {dateByPaymentType.cashProfit.toFixed(2)}</p>
+              <div className="sales-card-header">
+                <h4>AR / Cash by Date</h4>
+                {renderPaymentToggle(datePaymentView, handleDatePaymentViewChange)}
+              </div>
+              <input
+                type="date"
+                value={arCashDate}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setArCashDate(value);
+                  setSalesLogDate(value);
+                  setSalesLogStartDate("");
+                  setSalesLogEndDate("");
+                  setSalesLogPaymentType(value ? datePaymentView : "");
+                }}
+              />
+              <p>Showing for: {arCashDate || "-"}</p>
+              {datePaymentView === "Accounts Receivable" ? (
+                <>
+                  <p>AR Sales: PHP {dateByPaymentType.arSales.toFixed(2)}</p>
+                  <p>AR Profit: PHP {dateByPaymentType.arProfit.toFixed(2)}</p>
+                </>
+              ) : (
+                <>
+                  <p>Cash Sales: PHP {dateByPaymentType.cashSales.toFixed(2)}</p>
+                  <p>Cash Profit: PHP {dateByPaymentType.cashProfit.toFixed(2)}</p>
+                </>
+              )}
             </div>
             <div className="sales-card">
-              <h4>AR / Cash by Date Range</h4>
+              <div className="sales-card-header">
+                <h4>AR / Cash by Date Range</h4>
+                {renderPaymentToggle(rangePaymentView, handleRangePaymentViewChange)}
+              </div>
               <div className="sales-range">
                 <label>Start:</label>
-                <input type="date" value={salesStartDate} onChange={(e) => setSalesStartDate(e.target.value)} />
+                <input
+                  type="date"
+                  value={arCashStartDate}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setArCashStartDate(value);
+                    setSalesLogDate("");
+                    setSalesLogStartDate(value);
+                    setSalesLogEndDate(arCashEndDate);
+                    setSalesLogPaymentType(value && arCashEndDate ? rangePaymentView : "");
+                  }}
+                />
                 <label>End:</label>
-                <input type="date" value={salesEndDate} onChange={(e) => setSalesEndDate(e.target.value)} />
+                <input
+                  type="date"
+                  value={arCashEndDate}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setArCashEndDate(value);
+                    setSalesLogDate("");
+                    setSalesLogStartDate(arCashStartDate);
+                    setSalesLogEndDate(value);
+                    setSalesLogPaymentType(arCashStartDate && value ? rangePaymentView : "");
+                  }}
+                />
               </div>
-              <p>AR Sales: PHP {rangeByPaymentType.arSales.toFixed(2)}</p>
-              <p>AR Profit: PHP {rangeByPaymentType.arProfit.toFixed(2)}</p>
-              <p>Cash Sales: PHP {rangeByPaymentType.cashSales.toFixed(2)}</p>
-              <p>Cash Profit: PHP {rangeByPaymentType.cashProfit.toFixed(2)}</p>
+              {rangePaymentView === "Accounts Receivable" ? (
+                <>
+                  <p>AR Sales: PHP {rangeByPaymentType.arSales.toFixed(2)}</p>
+                  <p>AR Profit: PHP {rangeByPaymentType.arProfit.toFixed(2)}</p>
+                </>
+              ) : (
+                <>
+                  <p>Cash Sales: PHP {rangeByPaymentType.cashSales.toFixed(2)}</p>
+                  <p>Cash Profit: PHP {rangeByPaymentType.cashProfit.toFixed(2)}</p>
+                </>
+              )}
             </div>
           </div>
           
@@ -280,9 +463,28 @@ function MechanicDashboard() {
           <div className="sales-log-header">
             <h3>Sales Log</h3>
             <div className="sales-log-actions">
+              <div className="sales-search">
+                <label>Search:</label>
+                <input
+                  type="text"
+                  placeholder="JO no, plate, model, client..."
+                  value={salesSearch}
+                  onChange={(e) => setSalesSearch(e.target.value)}
+                />
+              </div>
               <div className="sales-filter">
                 <label>Date:</label>
-                <input type="date" value={salesLogDate} onChange={(e) => setSalesLogDate(e.target.value)} />
+                <input
+                  type="date"
+                  value={salesLogDate}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSalesLogDate(value);
+                    setSalesLogStartDate("");
+                    setSalesLogEndDate("");
+                    setSalesLogPaymentType("");
+                  }}
+                />
               </div>
             </div>
           </div>
@@ -305,15 +507,15 @@ function MechanicDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {filteredSalesOrders.length === 0 ? (
+                {searchedSalesOrders.length === 0 ? (
                   <tr><td colSpan="12" className="empty-message">No sales records yet.</td></tr>
                 ) : (
-                  filteredSalesOrders.map((o) => {
+                  searchedSalesOrders.map((o) => {
                     const totals = computeOrderTotals(o);
                     return (
                       <tr key={`sales-${o.id}`}>
                         <td>{toDateKey(getOrderDate(o)) || "-"}</td>
-                        <td>{formatJobOrderNo(o.joNumber || o.job_order_no)}</td>
+                        <td>{formatJobOrderNo(o.joNumber ?? o.job_order_no ?? 0)}</td>
                         <td>{o.vehicleModel || o.model || "-"} / {o.plate || o.plate_no || "-"}</td>
                         <td>₱{totals.totalLabor.toFixed(2)}</td>
                         <td>₱{totals.totalPartsPrice.toFixed(2)}</td>
@@ -353,5 +555,3 @@ function MechanicDashboard() {
 }
 
 export default MechanicDashboard;
-
-

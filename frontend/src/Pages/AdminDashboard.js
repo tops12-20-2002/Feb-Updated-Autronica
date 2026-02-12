@@ -630,7 +630,6 @@ function AdminDashboard() {
       plateNumber,
       dateIn,
       dateRelease,
-      customerType,
       assignedTo,
       contactNumber,
       subtotal,
@@ -669,13 +668,44 @@ function AdminDashboard() {
         ]
       },
       content: [
-        { columns: [{ text: "REF NO.: " + jobData.joNumber, bold: true, fontSize: 11 }, { text: "JOB ORDER NO.: " + jobData.joNumber, bold: true, fontSize: 11, alignment: "right" }], margin: [0, 5, 0, 10] },
-        { table: { widths: ["*", "*"], body: [[{ text: `Client Name: ${jobData.client}`, fontSize: 10 }, { text: `Address: ${jobData.address}`, fontSize: 10 }], [{ text: `Model: ${jobData.vehicleModel}`, fontSize: 10 }, { text: `Plate No: ${jobData.plateNumber}`, fontSize: 10 }], [{ text: `Date In: ${jobData.dateIn}`, fontSize: 10 }, { text: `Date Out: ${jobData.dateRelease}`, fontSize: 10 }], [{ text: `Customer Type: ${jobData.customerType}`, fontSize: 10 }, { text: `Contact No: ${jobData.contactNumber}`, fontSize: 10 }]] }, layout: "noBorders", margin: [0, 0, 0, 15] },
+        { columns: [{ text: "DETAILS: ", bold: true, fontSize: 11 }, { text: "JOB ORDER NO.: " + jobData.joNumber, bold: true, fontSize: 11, alignment: "right" }], margin: [0, 5, 0, 10] },
+        {
+          table: {
+            widths: [78, "*", 78, "*"],
+            body: [
+              [
+                { text: "Client Name:", bold: true, fontSize: 10 },
+                { text: jobData.client || "-", fontSize: 10 },
+                { text: "Address:", bold: true, fontSize: 10 },
+                { text: jobData.address || "-", fontSize: 10 }
+              ],
+              [
+                { text: "Model:", bold: true, fontSize: 10 },
+                { text: jobData.vehicleModel || "-", fontSize: 10 },
+                { text: "Plate No:", bold: true, fontSize: 10 },
+                { text: jobData.plateNumber || "-", fontSize: 10 }
+              ],
+              [
+                { text: "Date In:", bold: true, fontSize: 10 },
+                { text: jobData.dateIn || "-", fontSize: 10 },
+                { text: "Date Out:", bold: true, fontSize: 10 },
+                { text: jobData.dateRelease || "-", fontSize: 10 }
+              ],
+              [
+                { text: "Contact No:", bold: true, fontSize: 10 },
+                { text: jobData.contactNumber || "-", fontSize: 10 },
+                { text: "Technician:", bold: true, fontSize: 10 },
+                { text: jobData.assignedTo || "-", fontSize: 10 }
+              ]
+            ]
+          },
+          layout: "noBorders",
+          margin: [0, 0, 0, 15]
+        },
         { text: "SERVICES", style: "sectitle" },
         { table: { widths: ["*", 40, 40, 60, 60], headerRows: 1, body: [[{ text: "JOB/ITEM DESCRIPTION", bold: true, fontSize: 10 }, { text: "QNT", bold: true, alignment: "center", fontSize: 10 }, { text: "UNIT", bold: true, alignment: "center", fontSize: 10 }, { text: "AMOUNT", bold: true, alignment: "right", fontSize: 10 }, { text: "TOTAL AMOUNT", bold: true, alignment: "right", fontSize: 10 }], ...serviceRows] }, margin: [0, 0, 0, 10] },
         { text: "PARTS", style: "sectitle" },
         { table: { widths: ["*", 40, 40, 60, 60], headerRows: 1, body: [[{ text: "DESCRIPTION", bold: true, fontSize: 10 }, { text: "QNT", bold: true, alignment: "center", fontSize: 10 }, { text: "UNIT", bold: true, alignment: "center", fontSize: 10 }, { text: "AMOUNT", bold: true, alignment: "right", fontSize: 10 }, { text: "TOTAL AMOUNT", bold: true, alignment: "right", fontSize: 10 }], ...partsRows] }, margin: [0, 0, 0, 15] },
-        { text: `Mechanical/Technician: ${jobData.assignedTo}`, fontSize: 10, margin: [0, 0, 0, 15] },
         { text: `Subtotal: ₱${jobData.subtotal.toFixed(2)}`, alignment: "right", fontSize: 10 },
         { text: `Total: ₱${jobData.grandTotal.toFixed(2)}`, bold: true, alignment: "right", fontSize: 11, margin: [0, 0, 0, 20] }
       ],
@@ -782,23 +812,30 @@ function AdminDashboard() {
     ].some((v) => String(v || "").toLowerCase().includes(q));
   });
 
-  const filteredJobOrders = jobOrders.filter((o) => {
-    if (!jobSearch.trim()) return true;
-    const q = jobSearch.trim().toLowerCase();
-    return [
-      o.joNumber,
-      o.job_order_no,
-      o.client,
-      o.customer_name,
-      o.vehicleModel,
-      o.model,
-      o.plate,
-      o.plate_no,
-      o.status,
-      o.assignedTo,
-      o.assigned_to
-    ].some((v) => String(v || "").toLowerCase().includes(q));
-  });
+  const filteredJobOrders = jobOrders
+    .filter((o) => {
+      if (!jobSearch.trim()) return true;
+      const q = jobSearch.trim().toLowerCase();
+      return [
+        o.joNumber,
+        o.job_order_no,
+        o.client,
+        o.customer_name,
+        o.vehicleModel,
+        o.model,
+        o.plate,
+        o.plate_no,
+        o.status,
+        o.assignedTo,
+        o.assigned_to
+      ].some((v) => String(v || "").toLowerCase().includes(q));
+    })
+    .sort((a, b) => (parseInt(b.id, 10) || 0) - (parseInt(a.id, 10) || 0));
+
+  const editingJob = editJobId !== null ? jobOrders.find((j) => j.id === editJobId) : null;
+  const modalJobNumber = editJobId !== null
+    ? (editingJob?.status === "Completed" ? (editingJob?.joNumber ?? editingJob?.job_order_no ?? 0) : 0)
+    : (status === "Completed" ? jobOrderNo : 0);
 
   if (loading) {
     return <div style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>;
@@ -968,7 +1005,7 @@ function AdminDashboard() {
                       .filter(o => jobStatusFilter === "All" || o.status === jobStatusFilter)
                       .map((o) => (
                       <tr key={o.id}>
-                        <td>{formatJobOrderNo(o.joNumber || o.job_order_no)}</td>
+                        <td>{formatJobOrderNo(o.status === "Completed" ? (o.joNumber ?? o.job_order_no ?? 0) : 0)}</td>
                         <td>{o.client || o.customer_name}</td>
                         <td>{o.vehicleModel || o.model}</td>
                         <td>{o.plate || o.plate_no}</td>
@@ -1001,11 +1038,7 @@ function AdminDashboard() {
             <div className="joborder-modal">
               <div className="modal-header">
                 <p className="joborder-inline"><strong>
-                  Job Order No. {formatJobOrderNo(
-                    editJobId !== null
-                      ? jobOrders.find(j => j.id === editJobId)?.joNumber ?? 0
-                      : jobOrderNo
-                  )}
+                  Job Order No. {formatJobOrderNo(modalJobNumber)}
                 </strong>
                 </p>
                 <button className="export-btn" onClick={exportJobOrderPDF} disabled={!isJobFormValid()}>Export as PDF</button>
