@@ -329,7 +329,7 @@ function AdminDashboard() {
   };
 
   const persistJobOrder = async (statusOverride = null) => {
-    if (!isJobFormValid()) return;
+    if (!isJobFormValid()) return false;
 
     const orderData = {
       client: clientName,
@@ -370,12 +370,15 @@ function AdminDashboard() {
         resetJobForm();
         setShowJobOrderModal(false);
         setEditJobId(null);
+        return true;
       } else {
         alert(result.error || 'Failed to save job order');
+        return false;
       }
     } catch (error) {
       console.error('Error saving job order:', error);
       alert('Failed to save job order. Please try again.');
+      return false;
     }
   };
 
@@ -841,7 +844,10 @@ function AdminDashboard() {
     const currentJob = editJobId !== null ? jobOrders.find(j => j.id === editJobId) : null;
     const rawJobNo = currentJob?.joNumber ?? currentJob?.job_order_no ?? jobOrderNo;
     const formattedJobNo = formatJobOrderNo(rawJobNo);
-    const shouldComplete = status !== "Completed";
+
+    const saved = await persistJobOrder("Completed");
+    if (!saved) return;
+    setStatus("Completed");
 
     const jobData = {
       joNumber: formattedJobNo,
@@ -862,11 +868,6 @@ function AdminDashboard() {
 
     const docDefinition = await buildPdfDocDefinition(jobData);
     pdfMake.createPdf(docDefinition).download(`JOB-ORDER-${jobData.joNumber}.pdf`);
-
-    if (shouldComplete) {
-      setStatus("Completed");
-      await persistJobOrder("Completed");
-    }
   };
 
   const buildJobDataFromOrder = (order) => {
