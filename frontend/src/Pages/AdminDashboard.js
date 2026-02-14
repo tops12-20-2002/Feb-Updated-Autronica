@@ -25,6 +25,13 @@ function AdminDashboard() {
   // JOB ORDER STATES
   const [showJobOrderModal, setShowJobOrderModal] = useState(false);
   const [editJobId, setEditJobId] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: "",
+    message: "",
+    confirmLabel: "Delete",
+    onConfirm: null
+  });
   const [jobStatusFilter, setJobStatusFilter] = useState("All");
   const [isJobReadOnly, setIsJobReadOnly] = useState(false);
   const [inventorySearch, setInventorySearch] = useState("");
@@ -378,8 +385,6 @@ function AdminDashboard() {
   };
 
   const handleDeleteJobOrder = async (jobId) => {
-    if (!window.confirm('Are you sure you want to delete this job order?')) return;
-
     try {
       const result = await deleteJobOrder(jobId);
       if (result.success) {
@@ -391,6 +396,35 @@ function AdminDashboard() {
       console.error('Error deleting job order:', error);
       alert('Failed to delete job order. Please try again.');
     }
+  };
+
+  const openConfirmDialog = ({ title, message, confirmLabel = "Delete", onConfirm }) => {
+    setConfirmDialog({
+      open: true,
+      title,
+      message,
+      confirmLabel,
+      onConfirm
+    });
+  };
+
+  const closeConfirmDialog = () => {
+    setConfirmDialog({
+      open: false,
+      title: "",
+      message: "",
+      confirmLabel: "Delete",
+      onConfirm: null
+    });
+  };
+
+  const handleConfirmDialog = async () => {
+    if (!confirmDialog.onConfirm) {
+      closeConfirmDialog();
+      return;
+    }
+    await confirmDialog.onConfirm();
+    closeConfirmDialog();
   };
 
   const resetJobForm = () => {
@@ -604,8 +638,6 @@ function AdminDashboard() {
   };
 
   const handleDeleteProduct = async (productId) => {
-    if (!window.confirm('Are you sure you want to delete this product?')) return;
-
     try {
       const result = await deleteInventoryItem(productId);
       if (result.success) {
@@ -617,6 +649,22 @@ function AdminDashboard() {
       console.error('Error deleting product:', error);
       alert('Failed to delete product. Please try again.');
     }
+  };
+
+  const requestDeleteProduct = (productId) => {
+    openConfirmDialog({
+      title: "Delete Inventory Item",
+      message: "Are you sure you want to delete this product?",
+      onConfirm: () => handleDeleteProduct(productId)
+    });
+  };
+
+  const requestDeleteJobOrder = (jobId) => {
+    openConfirmDialog({
+      title: "Delete Job Order",
+      message: "Are you sure you want to delete this job order?",
+      onConfirm: () => handleDeleteJobOrder(jobId)
+    });
   };
 
   const handleLogout = async () => {
@@ -715,9 +763,27 @@ function AdminDashboard() {
           margin: [0, 0, 0, 15]
         },
         { text: "SERVICES", style: "sectitle" },
-        { table: { widths: ["*", 40, 40, 60, 60], headerRows: 1, body: [[{ text: "JOB/ITEM DESCRIPTION", bold: true, fontSize: 10 }, { text: "QNT", bold: true, alignment: "center", fontSize: 10 }, { text: "UNIT", bold: true, alignment: "center", fontSize: 10 }, { text: "AMOUNT", bold: true, alignment: "right", fontSize: 10 }, { text: "TOTAL AMOUNT", bold: true, alignment: "right", fontSize: 10 }], ...serviceRows] }, margin: [0, 0, 0, 10] },
+        {
+          table: { widths: ["*", 40, 40, 60, 60], headerRows: 1, body: [[{ text: "JOB/ITEM DESCRIPTION", bold: true, fontSize: 10 }, { text: "QNT", bold: true, alignment: "center", fontSize: 10 }, { text: "UNIT", bold: true, alignment: "center", fontSize: 10 }, { text: "AMOUNT", bold: true, alignment: "right", fontSize: 10 }, { text: "TOTAL AMOUNT", bold: true, alignment: "right", fontSize: 10 }], ...serviceRows] },
+          layout: {
+            fillColor: (rowIndex) => {
+              if (rowIndex === 0) return "#ffffff";
+              return rowIndex % 2 === 0 ? "#d9d9d9" : "#ffffff";
+            }
+          },
+          margin: [0, 0, 0, 10]
+        },
         { text: "PARTS", style: "sectitle" },
-        { table: { widths: ["*", 40, 40, 60, 60], headerRows: 1, body: [[{ text: "DESCRIPTION", bold: true, fontSize: 10 }, { text: "QNT", bold: true, alignment: "center", fontSize: 10 }, { text: "UNIT", bold: true, alignment: "center", fontSize: 10 }, { text: "AMOUNT", bold: true, alignment: "right", fontSize: 10 }, { text: "TOTAL AMOUNT", bold: true, alignment: "right", fontSize: 10 }], ...partsRows] }, margin: [0, 0, 0, 15] },
+        {
+          table: { widths: ["*", 40, 40, 60, 60], headerRows: 1, body: [[{ text: "DESCRIPTION", bold: true, fontSize: 10 }, { text: "QNT", bold: true, alignment: "center", fontSize: 10 }, { text: "UNIT", bold: true, alignment: "center", fontSize: 10 }, { text: "AMOUNT", bold: true, alignment: "right", fontSize: 10 }, { text: "TOTAL AMOUNT", bold: true, alignment: "right", fontSize: 10 }], ...partsRows] },
+          layout: {
+            fillColor: (rowIndex) => {
+              if (rowIndex === 0) return "#ffffff";
+              return rowIndex % 2 === 0 ? "#d9d9d9" : "#ffffff";
+            }
+          },
+          margin: [0, 0, 0, 15]
+        },
         { text: `Subtotal: \u20b1${Number(jobData.subtotal || 0).toFixed(2)}`, alignment: "right", fontSize: 10 },
         { text: `Total: \u20b1${Number(jobData.grandTotal || 0).toFixed(2)}`, bold: true, alignment: "right", fontSize: 11, margin: [0, 0, 0, 20] }
       ],
@@ -767,7 +833,7 @@ function AdminDashboard() {
           ]
         };
       },
-      styles: { header: { fontSize: 16, bold: true }, subheader: { fontSize: 10 }, sectitle: { fontSize: 11, bold: true, margin: [0, 5, 0, 5] } }
+      styles: { header: { fontSize: 16, bold: true }, subheader: { fontSize: 10 }, sectitle: { fontSize: 11, bold: true, color: "#0b5ed7", margin: [0, 5, 0, 5] } }
     };
   };
 
@@ -902,7 +968,12 @@ function AdminDashboard() {
         o.assigned_to
       ].some((v) => String(v || "").toLowerCase().includes(q));
     })
-    .sort((a, b) => (parseInt(b.id, 10) || 0) - (parseInt(a.id, 10) || 0));
+    .sort((a, b) => {
+      const aCompleted = (a.status || "") === "Completed" ? 1 : 0;
+      const bCompleted = (b.status || "") === "Completed" ? 1 : 0;
+      if (aCompleted !== bCompleted) return aCompleted - bCompleted;
+      return (parseInt(b.id, 10) || 0) - (parseInt(a.id, 10) || 0);
+    });
 
   const editingJob = editJobId !== null ? jobOrders.find((j) => j.id === editJobId) : null;
   const modalJobNumber = editJobId !== null
@@ -1022,7 +1093,7 @@ function AdminDashboard() {
                       <td>₱{parseFloat(p.srp_stan || 0).toFixed(2)}</td>
                       <td>
                         <button className="edit-btn" onClick={() => openEditModal(p.id)}>Edit</button>
-                        <button className="delete-btn" onClick={() => handleDeleteProduct(p.id)}>Delete</button>
+                        <button className="delete-btn" onClick={() => requestDeleteProduct(p.id)}>Delete</button>
                       </td>
                     </tr>
                   ))
@@ -1097,7 +1168,7 @@ function AdminDashboard() {
                           ) : (
                             <>
                               <button className="view-edit-btn" onClick={() => handleEditJob(o.id)}>Edit</button>
-                              <button className="delete-btn" onClick={() => handleDeleteJobOrder(o.id)} style={{ marginLeft: 8 }}>Delete</button>
+                              <button className="delete-btn" onClick={() => requestDeleteJobOrder(o.id)} style={{ marginLeft: 8 }}>Delete</button>
                             </>
                           )}
                         </td>
@@ -1175,7 +1246,9 @@ function AdminDashboard() {
                     <input type="number" min="0" placeholder="Qty" value={s.qty} onChange={(e) => updateService(i, "qty", e.target.value)} disabled={isJobReadOnly} />
                     <input type="number" min="0" step="0.01" placeholder="Price" value={s.unitPrice} onChange={(e) => updateService(i, "price", e.target.value)} onFocus={(e) => e.target.select()} disabled={isJobReadOnly} />
                     <input type="number" min="0" step="0.01" placeholder="Total Price" value={s.price} />
-                    <button className="delete-box" onClick={() => deleteService(i)} aria-label="Delete service" disabled={isJobReadOnly}>✕</button>
+                    {services.length > 1 && (
+                      <button className="delete-box" onClick={() => deleteService(i)} aria-label="Delete service" disabled={isJobReadOnly}>✕</button>
+                    )}
                   </div>
                 ))}
                 <button className="small-btn" onClick={addServiceRow} disabled={isJobReadOnly}>+ Add Service</button>
@@ -1203,7 +1276,9 @@ function AdminDashboard() {
                     <input type="number" min="0" placeholder="Qty" value={p.qty} onChange={(e) => updatePart(i, "qty", e.target.value)} disabled={isJobReadOnly} />
                     <input type="number" min="0" step="0.01" placeholder="Price" value={p.unitPrice} onChange={(e) => updatePart(i, "price", e.target.value)} onFocus={(e) => e.target.select()} disabled={isJobReadOnly} />
                     <input type="number" min="0" step="0.01" placeholder="Total Price" value={p.price} />
-                    <button className="delete-box" onClick={() => deletePart(i)} aria-label="Delete part" disabled={isJobReadOnly}>✕</button>
+                    {parts.length > 1 && (
+                      <button className="delete-box" onClick={() => deletePart(i)} aria-label="Delete part" disabled={isJobReadOnly}>✕</button>
+                    )}
                   </div>
                 ))}
                 <button className="small-btn" onClick={addPartRow} disabled={isJobReadOnly}>+ Add Part</button>
@@ -1277,6 +1352,23 @@ function AdminDashboard() {
           </div>
         )}
 
+        {confirmDialog.open && (
+          <div className="modal-container centered-modal">
+            <div className="modal-box product-modal" style={{ maxWidth: 460 }}>
+              <div className="product-modal-header">
+                <h2>{confirmDialog.title}</h2>
+              </div>
+              <div className="product-modal-body">
+                <p>{confirmDialog.message}</p>
+              </div>
+              <div className="product-modal-footer modal-actions">
+                <button className="cancel" onClick={closeConfirmDialog}>Cancel</button>
+                <button className="delete-btn" onClick={handleConfirmDialog}>{confirmDialog.confirmLabel}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {isEditModal && (
           <div className="modal-container">
             <div className="modal-box product-modal">
@@ -1316,4 +1408,3 @@ function AdminDashboard() {
 }
 
 export default AdminDashboard;
-

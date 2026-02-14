@@ -136,6 +136,7 @@ body,
   color: #fff;
   font-weight: 700;
 }
+.Primary:hover { background: #013bb1; }
 
 .GoogleBtn {
   margin-top: 10px;
@@ -149,6 +150,10 @@ body,
   border: 1px solid #d7d7d7;
   border-radius: 10px;
   padding: 10px 14px;
+}
+.GoogleBtn:hover {
+  background: #f3f4f6;
+  border-color: #c7cdd8;
 }
 
 .GIcon {
@@ -442,6 +447,9 @@ body,
   font-weight: 600;
   cursor: pointer;
 }
+.RolePasswordToggle:hover {
+  background: #dfe9ff;
+}
 
 .RolePasswordError {
   color: #d90429;
@@ -612,6 +620,7 @@ body,
   font-size: 15px;
   font-weight: 600;
 }
+.add-product-btn:hover { background: #2f76db; }
 
 /* Inventory table */
 .inventory-table {
@@ -733,6 +742,7 @@ body,
   color: white;
   cursor: pointer;
 }
+.save-btn:hover { background: #16a34a; }
 
 .cancel-btn {
   background: #e11d48;
@@ -742,6 +752,7 @@ body,
   color: white;
   cursor: pointer;
 }
+.cancel-btn:hover { background: #be123c; }
 
 /* Modal Overlay */
 .modal-container {
@@ -830,6 +841,7 @@ body,
   border-radius: 10px;
   border: none;
 }
+.modal-actions .cancel:hover { background: #5f5f5f; }
 
 .modal-actions .save {
   background: #3a8bff;
@@ -837,6 +849,23 @@ body,
   padding: 10px 18px;
   border-radius: 10px;
   border: none;
+}
+.modal-actions .save:hover { background: #2f76db; }
+
+.modal-actions .delete-btn {
+  background: #dc2626;
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  margin-right: 0;
+  transition: background-color 0.2s ease;
+}
+
+.modal-actions .delete-btn:hover {
+  background: #b91c1c;
+  color: #fff;
 }
 
 .empty-message {
@@ -886,6 +915,7 @@ background: none;
   font-size: 15px;
   font-weight: 600;
 }
+.create-joborder-btn:hover { background: #8242e8; }
 
 .joborders-filters {
   display: flex;
@@ -904,6 +934,7 @@ background: none;
   font-size: 14px;
   font-weight: 600;
 }
+.joborders-filters button:hover:not(.active) { background: #8a44f5; }
 
 .joborders-filters button.active {
   background: #7f2bff;
@@ -1196,6 +1227,7 @@ background: none;
   cursor: pointer;
   font-weight: 600;
 }
+.confirm-btn:hover:not(:disabled) { background: #0284c7; }
 
 .confirm-btn:disabled {
   background: #bcdcf0;
@@ -1287,6 +1319,7 @@ background: none;
   border-radius: 8px;
   cursor: pointer;
 }
+.export-btn:hover:not(:disabled) { background: #34d53a; }
 
 .export-btn:disabled {
   opacity: 0.4;
@@ -1375,6 +1408,9 @@ input, select {
 .back { background: #ccc; color: #111; }
 .save { background: #6c63ff; color: #fff; } /* compute */
 .finalize { background: #c77dff; color: #fff; } /* save */
+.back:hover { background: #b5b5b5; }
+.save:hover:not(:disabled) { background: #5a52e6; }
+.finalize:hover:not(:disabled) { background: #b062f2; }
 
 /* small button style */
 .small-btn {

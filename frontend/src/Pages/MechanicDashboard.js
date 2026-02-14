@@ -28,6 +28,13 @@ function MechanicDashboard() {
   const [salesLogEndDate, setSalesLogEndDate] = useState("");
   const [salesLogPaymentType, setSalesLogPaymentType] = useState("");
   const [salesSearch, setSalesSearch] = useState("");
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: "",
+    message: "",
+    confirmLabel: "Delete",
+    onConfirm: null
+  });
   const [dailyPaymentView, setDailyPaymentView] = useState("Accounts Receivable");
   const [datePaymentView, setDatePaymentView] = useState("Accounts Receivable");
   const [rangePaymentView, setRangePaymentView] = useState("Accounts Receivable");
@@ -73,8 +80,6 @@ function MechanicDashboard() {
   };
 
   const handleDeleteJobOrder = async (jobId) => {
-    if (!window.confirm("Are you sure you want to delete this completed job order?")) return;
-
     try {
       const result = await deleteJobOrder(jobId);
       if (result.success) {
@@ -86,6 +91,43 @@ function MechanicDashboard() {
       console.error("Error deleting job order:", error);
       alert("Failed to delete job order. Please try again.");
     }
+  };
+
+  const openConfirmDialog = ({ title, message, confirmLabel = "Delete", onConfirm }) => {
+    setConfirmDialog({
+      open: true,
+      title,
+      message,
+      confirmLabel,
+      onConfirm
+    });
+  };
+
+  const closeConfirmDialog = () => {
+    setConfirmDialog({
+      open: false,
+      title: "",
+      message: "",
+      confirmLabel: "Delete",
+      onConfirm: null
+    });
+  };
+
+  const handleConfirmDialog = async () => {
+    if (!confirmDialog.onConfirm) {
+      closeConfirmDialog();
+      return;
+    }
+    await confirmDialog.onConfirm();
+    closeConfirmDialog();
+  };
+
+  const requestDeleteJobOrder = (jobId) => {
+    openConfirmDialog({
+      title: "Delete Sales Log Record",
+      message: "Are you sure you want to delete this completed job order?",
+      onConfirm: () => handleDeleteJobOrder(jobId)
+    });
   };
 
   const handleUpdatePaymentType = async (order, nextPaymentType) => {
@@ -240,9 +282,27 @@ function MechanicDashboard() {
           margin: [0, 0, 0, 15]
         },
         { text: "SERVICES", style: "sectitle" },
-        { table: { widths: ["*", 40, 40, 60, 60], headerRows: 1, body: [[{ text: "JOB/ITEM DESCRIPTION", bold: true, fontSize: 10 }, { text: "QNT", bold: true, alignment: "center", fontSize: 10 }, { text: "UNIT", bold: true, alignment: "center", fontSize: 10 }, { text: "AMOUNT", bold: true, alignment: "right", fontSize: 10 }, { text: "TOTAL AMOUNT", bold: true, alignment: "right", fontSize: 10 }], ...serviceRows] }, margin: [0, 0, 0, 10] },
+        {
+          table: { widths: ["*", 40, 40, 60, 60], headerRows: 1, body: [[{ text: "JOB/ITEM DESCRIPTION", bold: true, fontSize: 10 }, { text: "QNT", bold: true, alignment: "center", fontSize: 10 }, { text: "UNIT", bold: true, alignment: "center", fontSize: 10 }, { text: "AMOUNT", bold: true, alignment: "right", fontSize: 10 }, { text: "TOTAL AMOUNT", bold: true, alignment: "right", fontSize: 10 }], ...serviceRows] },
+          layout: {
+            fillColor: (rowIndex) => {
+              if (rowIndex === 0) return "#ffffff";
+              return rowIndex % 2 === 0 ? "#d9d9d9" : "#ffffff";
+            }
+          },
+          margin: [0, 0, 0, 10]
+        },
         { text: "PARTS", style: "sectitle" },
-        { table: { widths: ["*", 40, 40, 60, 60], headerRows: 1, body: [[{ text: "DESCRIPTION", bold: true, fontSize: 10 }, { text: "QNT", bold: true, alignment: "center", fontSize: 10 }, { text: "UNIT", bold: true, alignment: "center", fontSize: 10 }, { text: "AMOUNT", bold: true, alignment: "right", fontSize: 10 }, { text: "TOTAL AMOUNT", bold: true, alignment: "right", fontSize: 10 }], ...partsRows] }, margin: [0, 0, 0, 15] },
+        {
+          table: { widths: ["*", 40, 40, 60, 60], headerRows: 1, body: [[{ text: "DESCRIPTION", bold: true, fontSize: 10 }, { text: "QNT", bold: true, alignment: "center", fontSize: 10 }, { text: "UNIT", bold: true, alignment: "center", fontSize: 10 }, { text: "AMOUNT", bold: true, alignment: "right", fontSize: 10 }, { text: "TOTAL AMOUNT", bold: true, alignment: "right", fontSize: 10 }], ...partsRows] },
+          layout: {
+            fillColor: (rowIndex) => {
+              if (rowIndex === 0) return "#ffffff";
+              return rowIndex % 2 === 0 ? "#d9d9d9" : "#ffffff";
+            }
+          },
+          margin: [0, 0, 0, 15]
+        },
         { text: `Subtotal: \u20b1${Number(jobData.subtotal || 0).toFixed(2)}`, alignment: "right", fontSize: 10 },
         { text: `Total: \u20b1${Number(jobData.grandTotal || 0).toFixed(2)}`, bold: true, alignment: "right", fontSize: 11, margin: [0, 0, 0, 20] }
       ],
@@ -287,7 +347,7 @@ function MechanicDashboard() {
           ]
         };
       },
-      styles: { header: { fontSize: 16, bold: true }, subheader: { fontSize: 10 }, sectitle: { fontSize: 11, bold: true, margin: [0, 5, 0, 5] } }
+      styles: { header: { fontSize: 16, bold: true }, subheader: { fontSize: 10 }, sectitle: { fontSize: 11, bold: true, color: "#0b5ed7", margin: [0, 5, 0, 5] } }
     };
   };
 
@@ -713,7 +773,7 @@ function MechanicDashboard() {
                         </td>
                         <td>
                           <button className="view-edit-btn" onClick={() => viewSalesLogPDF(o)}>View</button>
-                          <button className="delete-btn" onClick={() => handleDeleteJobOrder(o.id)} style={{ marginLeft: 8 }}>Delete</button>
+                          <button className="delete-btn" onClick={() => requestDeleteJobOrder(o.id)} style={{ marginLeft: 8 }}>Delete</button>
                         </td>
                       </tr>
                     );
@@ -724,6 +784,23 @@ function MechanicDashboard() {
           </div>
         </div>
       </div>
+
+      {confirmDialog.open && (
+        <div className="modal-container centered-modal">
+          <div className="modal-box product-modal" style={{ maxWidth: 460 }}>
+            <div className="product-modal-header">
+              <h2>{confirmDialog.title}</h2>
+            </div>
+            <div className="product-modal-body">
+              <p>{confirmDialog.message}</p>
+            </div>
+            <div className="product-modal-footer modal-actions">
+              <button className="cancel" onClick={closeConfirmDialog}>Cancel</button>
+              <button className="delete-btn" onClick={handleConfirmDialog}>{confirmDialog.confirmLabel}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
