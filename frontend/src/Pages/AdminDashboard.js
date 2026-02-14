@@ -17,6 +17,7 @@ function AdminDashboard() {
   const formatJobOrderNo = (num) => String(num).padStart(4, "0");
 
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [tabDirection, setTabDirection] = useState("none");
   const [products, setProducts] = useState([]);
   const [jobOrders, setJobOrders] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
@@ -25,6 +26,7 @@ function AdminDashboard() {
   // JOB ORDER STATES
   const [showJobOrderModal, setShowJobOrderModal] = useState(false);
   const [editJobId, setEditJobId] = useState(null);
+  const [jobFilterDirection, setJobFilterDirection] = useState("none");
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,
     title: "",
@@ -981,6 +983,29 @@ function AdminDashboard() {
     ? (editingJob?.status === "Completed" ? (editingJob?.joNumber ?? editingJob?.job_order_no ?? 0) : 0)
     : (status === "Completed" ? jobOrderNo : 0);
 
+  const handleTabChange = (nextTab) => {
+    if (nextTab === activeTab) return;
+    const tabIndex = { dashboard: 0, inventory: 1, jobs: 2 };
+    const currentIndex = tabIndex[activeTab] ?? 0;
+    const nextIndex = tabIndex[nextTab] ?? 0;
+    setTabDirection(nextIndex > currentIndex ? "slide-right" : "slide-left");
+    setActiveTab(nextTab);
+  };
+
+  const handleJobStatusFilterChange = (nextFilter) => {
+    if (nextFilter === jobStatusFilter) return;
+    const filterIndex = {
+      All: 0,
+      Pending: 1,
+      "In Progress": 2,
+      Completed: 3
+    };
+    const currentIndex = filterIndex[jobStatusFilter] ?? 0;
+    const nextIndex = filterIndex[nextFilter] ?? 0;
+    setJobFilterDirection(nextIndex > currentIndex ? "slide-right" : "slide-left");
+    setJobStatusFilter(nextFilter);
+  };
+
   if (loading) {
     return <div style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>;
   }
@@ -993,15 +1018,16 @@ function AdminDashboard() {
             <img src={logoSrc} className="admin-logo" alt="Autronicas logo" />
           </div>
           <nav className="admin-nav">
-            <button className={activeTab === "dashboard" ? "active" : ""} onClick={() => setActiveTab("dashboard")}>Dashboard</button>
-            <button className={activeTab === "inventory" ? "active" : ""} onClick={() => setActiveTab("inventory")}>Inventory</button>
-            <button className={activeTab === "jobs" ? "active" : ""} onClick={() => setActiveTab("jobs")}>Job Orders</button>
+            <button className={activeTab === "dashboard" ? "active" : ""} onClick={() => handleTabChange("dashboard")}>Dashboard</button>
+            <button className={activeTab === "inventory" ? "active" : ""} onClick={() => handleTabChange("inventory")}>Inventory</button>
+            <button className={activeTab === "jobs" ? "active" : ""} onClick={() => handleTabChange("jobs")}>Job Orders</button>
             <button className="logout" onClick={handleLogout}>Logout</button>
           </nav>
         </div>
       </header>
 
       <div className="dashboard-content">
+        <div key={activeTab} className={`tab-slide-panel ${tabDirection}`}>
         {activeTab === "dashboard" && (
           <>
             <h2>Dashboard Overview</h2>
@@ -1120,67 +1146,70 @@ function AdminDashboard() {
               />
             </div>
             <div className="joborders-filters">
-              <button className={jobStatusFilter === "All" ? "active" : ""} onClick={() => setJobStatusFilter("All")}>All</button>
-              <button className={jobStatusFilter === "Pending" ? "active" : ""} onClick={() => setJobStatusFilter("Pending")}>Pending</button>
-              <button className={jobStatusFilter === "In Progress" ? "active" : ""} onClick={() => setJobStatusFilter("In Progress")}>In Progress</button>
-              <button className={jobStatusFilter === "Completed" ? "active" : ""} onClick={() => setJobStatusFilter("Completed")}>Completed</button>
+              <button className={jobStatusFilter === "All" ? "active" : ""} onClick={() => handleJobStatusFilterChange("All")}>All</button>
+              <button className={jobStatusFilter === "Pending" ? "active" : ""} onClick={() => handleJobStatusFilterChange("Pending")}>Pending</button>
+              <button className={jobStatusFilter === "In Progress" ? "active" : ""} onClick={() => handleJobStatusFilterChange("In Progress")}>In Progress</button>
+              <button className={jobStatusFilter === "Completed" ? "active" : ""} onClick={() => handleJobStatusFilterChange("Completed")}>Completed</button>
             </div>
-            <div className="joborders-table-wrapper">
-              <table className="joborders-table">
-                <thead>
-                  <tr>
-                    <th>JOB ORDER NO.</th>
-                    <th>CLIENT NAME</th>
-                    <th>VEHICLE MODEL</th>
-                    <th>PLATE NUMBER</th>
-                    <th>TOTAL PRICE</th>
-                    <th>STATUS</th>
-                    <th>ASSIGNED TO</th>
-                    <th>DATE IN</th>
-                    <th>DATE RELEASE</th>
-                    <th>ACTIONS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredJobOrders.filter(o => jobStatusFilter === "All" || o.status === jobStatusFilter).length === 0 ? (
-                    <tr><td colSpan="10" className="empty-message">No job orders created yet.</td></tr>
-                  ) : (
-                    filteredJobOrders
-                      .filter(o => jobStatusFilter === "All" || o.status === jobStatusFilter)
-                      .map((o) => (
-                      <tr key={o.id}>
-                        <td>{formatJobOrderNo(o.status === "Completed" ? (o.joNumber ?? o.job_order_no ?? 0) : 0)}</td>
-                        <td>{o.client || o.customer_name}</td>
-                        <td>{o.vehicleModel || o.model}</td>
-                        <td>{o.plate || o.plate_no}</td>
-                        <td>₱{Number(o.total || o.total_amount || 0).toFixed(2)}</td>
-                        <td>
-                          <span className={o.status === "Pending" ? "status-tag yellow" : o.status === "In Progress" ? "status-tag blue" : "status-tag green"}>{o.status}</span>
-                        </td>
-                        <td>{o.assignedTo || o.assigned_to}</td>
-                        <td>{o.dateIn || o.date}</td>
-                        <td>{o.dateRelease || o.date_release || '-'}</td>
-                        <td className="actions">
-                          {o.status === "Completed" ? (
-                            <>
-                              <button className="view-edit-btn" onClick={() => viewJobOrderPDF(o.id)}>View</button>
-                              <button className="view-edit-btn" onClick={() => downloadJobOrderPDF(o.id)} style={{ marginLeft: 8 }}>Download</button>
-                            </>
-                          ) : (
-                            <>
-                              <button className="view-edit-btn" onClick={() => handleEditJob(o.id)}>Edit</button>
-                              <button className="delete-btn" onClick={() => requestDeleteJobOrder(o.id)} style={{ marginLeft: 8 }}>Delete</button>
-                            </>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+            <div key={jobStatusFilter} className={`job-filter-slide-panel ${jobFilterDirection}`}>
+              <div className="joborders-table-wrapper">
+                <table className="joborders-table">
+                  <thead>
+                    <tr>
+                      <th>JOB ORDER NO.</th>
+                      <th>CLIENT NAME</th>
+                      <th>VEHICLE MODEL</th>
+                      <th>PLATE NUMBER</th>
+                      <th>TOTAL PRICE</th>
+                      <th>STATUS</th>
+                      <th>ASSIGNED TO</th>
+                      <th>DATE IN</th>
+                      <th>DATE RELEASE</th>
+                      <th>ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredJobOrders.filter(o => jobStatusFilter === "All" || o.status === jobStatusFilter).length === 0 ? (
+                      <tr><td colSpan="10" className="empty-message">No job orders created yet.</td></tr>
+                    ) : (
+                      filteredJobOrders
+                        .filter(o => jobStatusFilter === "All" || o.status === jobStatusFilter)
+                        .map((o) => (
+                        <tr key={o.id}>
+                          <td>{formatJobOrderNo(o.status === "Completed" ? (o.joNumber ?? o.job_order_no ?? 0) : 0)}</td>
+                          <td>{o.client || o.customer_name}</td>
+                          <td>{o.vehicleModel || o.model}</td>
+                          <td>{o.plate || o.plate_no}</td>
+                          <td>?{Number(o.total || o.total_amount || 0).toFixed(2)}</td>
+                          <td>
+                            <span className={o.status === "Pending" ? "status-tag yellow" : o.status === "In Progress" ? "status-tag blue" : "status-tag green"}>{o.status}</span>
+                          </td>
+                          <td>{o.assignedTo || o.assigned_to}</td>
+                          <td>{o.dateIn || o.date}</td>
+                          <td>{o.dateRelease || o.date_release || '-'}</td>
+                          <td className="actions">
+                            {o.status === "Completed" ? (
+                              <>
+                                <button className="view-edit-btn" onClick={() => viewJobOrderPDF(o.id)}>View</button>
+                                <button className="view-edit-btn" onClick={() => downloadJobOrderPDF(o.id)} style={{ marginLeft: 8 }}>Download</button>
+                              </>
+                            ) : (
+                              <>
+                                <button className="view-edit-btn" onClick={() => handleEditJob(o.id)}>Edit</button>
+                                <button className="delete-btn" onClick={() => requestDeleteJobOrder(o.id)} style={{ marginLeft: 8 }}>Delete</button>
+                              </>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
+        </div>
 
         {showJobOrderModal && (
           <div className="joborder-overlay">
@@ -1204,7 +1233,7 @@ function AdminDashboard() {
                     <input type="text" placeholder="Enter vehicle model" value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} disabled={isJobReadOnly} />
                     <label>Date In</label>
                     <input type="date" value={dateIn} onChange={(e) => setDateIn(e.target.value)} disabled={isJobReadOnly} />
-                    <label>Assigned To</label>                    
+                    <label>Assigned To</label>
                     <input type="text" placeholder="Enter mechanic" value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} disabled={isJobReadOnly} />
                     <label>Payment Type</label>
                     <select value={paymentType} onChange={(e) => setPaymentType(e.target.value)} disabled={isJobReadOnly}>
@@ -1232,7 +1261,6 @@ function AdminDashboard() {
                       <option>In Progress</option>
                       <option>Completed</option>
                     </select>
-                    
                   </div>
                 </div>
 
@@ -1248,7 +1276,7 @@ function AdminDashboard() {
                     <input type="number" min="0" step="0.01" placeholder="Price" value={s.unitPrice} onChange={(e) => updateService(i, "price", e.target.value)} onFocus={(e) => e.target.select()} disabled={isJobReadOnly} />
                     <input type="number" min="0" step="0.01" placeholder="Total Price" value={s.price} />
                     {services.length > 1 && (
-                      <button className="delete-box" onClick={() => deleteService(i)} aria-label="Delete service" disabled={isJobReadOnly}>✕</button>
+                      <button className="delete-box" onClick={() => deleteService(i)} aria-label="Delete service" disabled={isJobReadOnly}>?</button>
                     )}
                   </div>
                 ))}
@@ -1278,7 +1306,7 @@ function AdminDashboard() {
                     <input type="number" min="0" step="0.01" placeholder="Price" value={p.unitPrice} onChange={(e) => updatePart(i, "price", e.target.value)} onFocus={(e) => e.target.select()} disabled={isJobReadOnly} />
                     <input type="number" min="0" step="0.01" placeholder="Total Price" value={p.price} />
                     {parts.length > 1 && (
-                      <button className="delete-box" onClick={() => deletePart(i)} aria-label="Delete part" disabled={isJobReadOnly}>✕</button>
+                      <button className="delete-box" onClick={() => deletePart(i)} aria-label="Delete part" disabled={isJobReadOnly}>?</button>
                     )}
                   </div>
                 ))}
@@ -1286,9 +1314,9 @@ function AdminDashboard() {
 
                 <hr />
                 <div className="totals">
-                  <p>Subtotal: ₱{Number(subtotal).toFixed(2)}</p>
+                  <p>Subtotal: ?{Number(subtotal).toFixed(2)}</p>
                   <p>
-                    Discount: ₱
+                    Discount: ?
                     <input
                       type="number"
                       min="0"
@@ -1300,7 +1328,7 @@ function AdminDashboard() {
                       disabled={isJobReadOnly}
                     />
                   </p>
-                  <p><b>Total: ₱{Number(grandTotal).toFixed(2)}</b></p>
+                  <p><b>Total: ?{Number(grandTotal).toFixed(2)}</b></p>
                 </div>
               </div>
 
@@ -1409,3 +1437,4 @@ function AdminDashboard() {
 }
 
 export default AdminDashboard;
+
