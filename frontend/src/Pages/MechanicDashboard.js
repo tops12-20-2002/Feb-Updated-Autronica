@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "../Style.css";
+import pdfMake from "pdfmake/build/pdfmake.min";
+import pdfFonts from "pdfmake/build/vfs_fonts";
 
 import { getInventory } from "../api/inventory";
 import { getJobOrders, updateJobOrder, deleteJobOrder } from "../api/jobOrders";
 import { clearAuth } from "../utils/auth";
 import { logout as logoutAPI } from "../api/auth";
+pdfMake.vfs = pdfFonts.vfs;
 
 function MechanicDashboard() {
   const navigate = useNavigate();
@@ -123,6 +126,176 @@ function MechanicDashboard() {
   const formatJobOrderNo = (num) => String(num).padStart(4, "0");
   const getOrderDate = (order) => order.dateIn || order.date || "";
   const toDateKey = (dateStr) => (dateStr ? dateStr.slice(0, 10) : "");
+
+  const loadBase64Image = (url) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      fetch(url)
+        .then((res) => res.blob())
+        .then((blob) => {
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
+        });
+    });
+  };
+
+  const normalizePdfLineItem = (item) => {
+    const qty = parseFloat(item?.qty ?? item?.quantity ?? 0) || 0;
+    const totalRaw = parseFloat(item?.price ?? item?.total);
+    const unitRaw = parseFloat(item?.unitPrice ?? item?.unit_price);
+    const total = Number.isNaN(totalRaw) ? 0 : totalRaw;
+    const unitPrice = Number.isNaN(unitRaw) ? (qty > 0 ? total / qty : 0) : unitRaw;
+    return { qty, unitPrice, total };
+  };
+
+  const buildJobDataFromOrder = (order) => {
+    const rawNo = order?.joNumber ?? order?.job_order_no ?? 0;
+    return {
+      joNumber: formatJobOrderNo(rawNo),
+      client: order?.client || order?.customer_name || "",
+      address: order?.address || "",
+      vehicleModel: order?.vehicleModel || order?.model || "",
+      plateNumber: order?.plate || order?.plate_no || "",
+      dateIn: order?.dateIn || order?.date || "",
+      dateRelease: order?.dateRelease || order?.date_release || "",
+      assignedTo: order?.assignedTo || order?.assigned_to || "",
+      contactNumber: order?.contactNumber || order?.contact_no || "",
+      subtotal: parseFloat(order?.subtotal || 0) || 0,
+      grandTotal: parseFloat(order?.total || order?.total_amount || 0) || 0,
+      services: order?.services || [],
+      parts: order?.parts || []
+    };
+  };
+
+  const buildPdfDocDefinition = async (jobData) => {
+    const logoBase64 = await loadBase64Image(process.env.PUBLIC_URL + "/AutronicasLogo.png");
+
+    const serviceRows = (jobData.services || []).map((s) => {
+      const { qty, unitPrice, total } = normalizePdfLineItem(s);
+      return ([
+        { text: s.description || "", fontSize: 10 },
+        { text: qty, alignment: "center", fontSize: 10 },
+        { text: s.unit || "", alignment: "center", fontSize: 10 },
+        { text: unitPrice.toFixed(2), alignment: "right", fontSize: 10 },
+        { text: total.toFixed(2), alignment: "right", fontSize: 10 }
+      ]);
+    });
+
+    const partsRows = (jobData.parts || []).map((p) => {
+      const { qty, unitPrice, total } = normalizePdfLineItem(p);
+      return ([
+        { text: String(p.description || "").replace(/^[^-]+-\s*/, ""), fontSize: 10 },
+        { text: qty, alignment: "center", fontSize: 10 },
+        { text: p.unit || "", alignment: "center", fontSize: 10 },
+        { text: unitPrice.toFixed(2), alignment: "right", fontSize: 10 },
+        { text: total.toFixed(2), alignment: "right", fontSize: 10 }
+      ]);
+    });
+
+    return {
+      pageSize: "LETTER",
+      pageMargins: [40, 110, 40, 120],
+      header: {
+        margin: [40, 20, 40, 0],
+        stack: [
+          { image: logoBase64, width: 120, alignment: "center", margin: [0, 0, 0, 2] },
+          { text: "AUTO SERVICE AND SPARE PARTS CORP.", style: "header", alignment: "center", color: "#0b5ed7" },
+          { text: "MAHARLIKA HIGHWAY SITIO BAGONG TULAY BRGY. BUKAL PAGBILAO QUEZON", style: "subheader", alignment: "center", color: "#0b5ed7" },
+          { text: "SMART: 09989990252   GLOBE: 09171874571", style: "subheader", alignment: "center", margin: [0, 0, 0, 10], color: "#0b5ed7" }
+        ]
+      },
+      content: [
+        { columns: [{ text: "DETAILS: ", bold: true, fontSize: 11 }, { text: "JOB ORDER NO.: " + jobData.joNumber, bold: true, fontSize: 11, alignment: "right" }], margin: [0, 5, 0, 10] },
+        {
+          table: {
+            widths: [78, "*", 78, "*"],
+            body: [
+              [
+                { text: "Client Name:", bold: true, fontSize: 10 },
+                { text: jobData.client || "-", fontSize: 10 },
+                { text: "Address:", bold: true, fontSize: 10 },
+                { text: jobData.address || "-", fontSize: 10 }
+              ],
+              [
+                { text: "Model:", bold: true, fontSize: 10 },
+                { text: jobData.vehicleModel || "-", fontSize: 10 },
+                { text: "Plate No:", bold: true, fontSize: 10 },
+                { text: jobData.plateNumber || "-", fontSize: 10 }
+              ],
+              [
+                { text: "Date In:", bold: true, fontSize: 10 },
+                { text: jobData.dateIn || "-", fontSize: 10 },
+                { text: "Date Out:", bold: true, fontSize: 10 },
+                { text: jobData.dateRelease || "-", fontSize: 10 }
+              ],
+              [
+                { text: "Contact No:", bold: true, fontSize: 10 },
+                { text: jobData.contactNumber || "-", fontSize: 10 },
+                { text: "Technician:", bold: true, fontSize: 10 },
+                { text: jobData.assignedTo || "-", fontSize: 10 }
+              ]
+            ]
+          },
+          layout: "noBorders",
+          margin: [0, 0, 0, 15]
+        },
+        { text: "SERVICES", style: "sectitle" },
+        { table: { widths: ["*", 40, 40, 60, 60], headerRows: 1, body: [[{ text: "JOB/ITEM DESCRIPTION", bold: true, fontSize: 10 }, { text: "QNT", bold: true, alignment: "center", fontSize: 10 }, { text: "UNIT", bold: true, alignment: "center", fontSize: 10 }, { text: "AMOUNT", bold: true, alignment: "right", fontSize: 10 }, { text: "TOTAL AMOUNT", bold: true, alignment: "right", fontSize: 10 }], ...serviceRows] }, margin: [0, 0, 0, 10] },
+        { text: "PARTS", style: "sectitle" },
+        { table: { widths: ["*", 40, 40, 60, 60], headerRows: 1, body: [[{ text: "DESCRIPTION", bold: true, fontSize: 10 }, { text: "QNT", bold: true, alignment: "center", fontSize: 10 }, { text: "UNIT", bold: true, alignment: "center", fontSize: 10 }, { text: "AMOUNT", bold: true, alignment: "right", fontSize: 10 }, { text: "TOTAL AMOUNT", bold: true, alignment: "right", fontSize: 10 }], ...partsRows] }, margin: [0, 0, 0, 15] },
+        { text: `Subtotal: \u20b1${Number(jobData.subtotal || 0).toFixed(2)}`, alignment: "right", fontSize: 10 },
+        { text: `Total: \u20b1${Number(jobData.grandTotal || 0).toFixed(2)}`, bold: true, alignment: "right", fontSize: 11, margin: [0, 0, 0, 20] }
+      ],
+      footer: function (currentPage, pageCount) {
+        return {
+          margin: [40, 20, 40, 40],
+          stack: [
+            {
+              columns: [
+                {
+                  width: "50%",
+                  stack: [
+                    { text: "Chief Mechanic:", fontSize: 9, italics: true },
+                    { text: "Leo Palmero", fontSize: 10, bold: true, italics: true }
+                  ],
+                  alignment: "center"
+                },
+                {
+                  width: "50%",
+                  stack: [
+                    { text: "Prepared By:", fontSize: 9, italics: true },
+                    { text: "Carmela Angulo", fontSize: 10, bold: true, italics: true }
+                  ],
+                  alignment: "center"
+                }
+              ]
+            },
+            { text: "", margin: [0, 10] },
+            {
+              text: "Note: I hereby acknowledge that all items and labor are in good condition/s",
+              fontSize: 9
+            },
+            { text: "Received By:", fontSize: 10, margin: [0, 12, 0, 6] },
+            { text: "_____________________________", fontSize: 10 },
+            {
+              text: `Page ${currentPage} of ${pageCount}`,
+              alignment: "right",
+              fontSize: 8,
+              margin: [0, 10, 0, 0],
+              color: "#666"
+            }
+          ]
+        };
+      },
+      styles: { header: { fontSize: 16, bold: true }, subheader: { fontSize: 10 }, sectitle: { fontSize: 11, bold: true, margin: [0, 5, 0, 5] } }
+    };
+  };
+
+  const viewSalesLogPDF = async (order) => {
+    const jobData = buildJobDataFromOrder(order);
+    const docDefinition = await buildPdfDocDefinition(jobData);
+    pdfMake.createPdf(docDefinition).open();
+  };
 
   const computeOrderTotals = (order) => {
     const servicesList = order.services || [];
@@ -539,7 +712,8 @@ function MechanicDashboard() {
                           </select>
                         </td>
                         <td>
-                          <button className="delete-btn" onClick={() => handleDeleteJobOrder(o.id)}>Delete</button>
+                          <button className="view-edit-btn" onClick={() => viewSalesLogPDF(o)}>View</button>
+                          <button className="delete-btn" onClick={() => handleDeleteJobOrder(o.id)} style={{ marginLeft: 8 }}>Delete</button>
                         </td>
                       </tr>
                     );

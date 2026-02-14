@@ -419,23 +419,41 @@ function AdminDashboard() {
     if (!job) return;
 
     const normalizedServices = job.services && job.services.length > 0
-      ? job.services.map((s) => ({
-          description: s.description ?? "",
-          unit: s.unit ?? "",
-          qty: s.qty ?? s.quantity ?? "",
-          price: s.price ?? "",
-          unitPrice: s.unitPrice ?? s.unit_price ?? s.price ?? "",
-        }))
+      ? job.services.map((s) => {
+          const qtyValue = s.qty ?? s.quantity ?? "";
+          const qtyNumber = parseFloat(qtyValue) || 0;
+          const totalPrice = s.price ?? s.total ?? "";
+          const parsedTotal = parseFloat(totalPrice);
+          const fallbackUnitPrice = qtyNumber > 0 && !Number.isNaN(parsedTotal)
+            ? (parsedTotal / qtyNumber).toFixed(2)
+            : "";
+          return {
+            description: s.description ?? "",
+            unit: s.unit ?? "",
+            qty: qtyValue,
+            price: totalPrice,
+            unitPrice: s.unitPrice ?? s.unit_price ?? fallbackUnitPrice,
+          };
+        })
       : [{ description: "", unit: "", qty: "", price: "", unitPrice: "" }];
 
     const normalizedParts = job.parts && job.parts.length > 0
-      ? job.parts.map((p) => ({
-          description: p.description ?? "",
-          unit: p.unit ?? "",
-          qty: p.qty ?? p.quantity ?? "",
-          price: p.price ?? "",
-          unitPrice: p.unitPrice ?? p.unit_price ?? p.price ?? "",
-        }))
+      ? job.parts.map((p) => {
+          const qtyValue = p.qty ?? p.quantity ?? "";
+          const qtyNumber = parseFloat(qtyValue) || 0;
+          const totalPrice = p.price ?? p.total ?? "";
+          const parsedTotal = parseFloat(totalPrice);
+          const fallbackUnitPrice = qtyNumber > 0 && !Number.isNaN(parsedTotal)
+            ? (parsedTotal / qtyNumber).toFixed(2)
+            : "";
+          return {
+            description: p.description ?? "",
+            unit: p.unit ?? "",
+            qty: qtyValue,
+            price: totalPrice,
+            unitPrice: p.unitPrice ?? p.unit_price ?? fallbackUnitPrice,
+          };
+        })
       : [{ description: "", qty: "", unit: "", price: "", unitPrice: "" }];
 
     setEditJobId(jobId);
@@ -615,47 +633,41 @@ function AdminDashboard() {
     }
   };
 
-  const exportJobOrderPDF = async () => {
+  const normalizePdfLineItem = (item) => {
+    const qty = parseFloat(item?.qty ?? item?.quantity ?? 0) || 0;
+    const totalRaw = parseFloat(item?.price ?? item?.total);
+    const unitRaw = parseFloat(item?.unitPrice ?? item?.unit_price);
+    const total = Number.isNaN(totalRaw) ? 0 : totalRaw;
+    const unitPrice = Number.isNaN(unitRaw) ? (qty > 0 ? total / qty : 0) : unitRaw;
+    return { qty, unitPrice, total };
+  };
+
+  const buildPdfDocDefinition = async (jobData) => {
     const logoBase64 = await loadBase64Image(process.env.PUBLIC_URL + "/AutronicasLogo.png");
-    const currentJob = editJobId !== null ? jobOrders.find(j => j.id === editJobId) : null;
-    const rawJobNo = currentJob?.joNumber ?? currentJob?.job_order_no ?? jobOrderNo;
-    const formattedJobNo = formatJobOrderNo(rawJobNo);
-    const shouldComplete = status !== "Completed";
 
-    const jobData = {
-      joNumber: formattedJobNo,
-      client: clientName,
-      address,
-      vehicleModel,
-      plateNumber,
-      dateIn,
-      dateRelease,
-      assignedTo,
-      contactNumber,
-      subtotal,
-      discount,
-      grandTotal,
-      services,
-      parts
-    };
+    const serviceRows = (jobData.services || []).map((s) => {
+      const { qty, unitPrice, total } = normalizePdfLineItem(s);
+      return ([
+        { text: s.description || "", fontSize: 10 },
+        { text: qty, alignment: "center", fontSize: 10 },
+        { text: s.unit || "", alignment: "center", fontSize: 10 },
+        { text: unitPrice.toFixed(2), alignment: "right", fontSize: 10 },
+        { text: total.toFixed(2), alignment: "right", fontSize: 10 }
+      ]);
+    });
 
-    const serviceRows = jobData.services.map(s => ([
-      { text: s.description, fontSize: 10 },
-      { text: s.qty, alignment: "center", fontSize: 10 },
-      { text: s.unit, alignment: "center", fontSize: 10 },
-      { text: Number(s.price).toFixed(2), alignment: "right", fontSize: 10 },
-      { text: (parseFloat(s.qty) * parseFloat(s.price)).toFixed(2), alignment: "right", fontSize: 10 }
-    ]));
+    const partsRows = (jobData.parts || []).map((p) => {
+      const { qty, unitPrice, total } = normalizePdfLineItem(p);
+      return ([
+        { text: String(p.description || "").replace(/^[^-]+-\s*/, ""), fontSize: 10 },
+        { text: qty, alignment: "center", fontSize: 10 },
+        { text: p.unit || "", alignment: "center", fontSize: 10 },
+        { text: unitPrice.toFixed(2), alignment: "right", fontSize: 10 },
+        { text: total.toFixed(2), alignment: "right", fontSize: 10 }
+      ]);
+    });
 
-    const partsRows = jobData.parts.map(p => ([
-      { text: String(p.description || "").replace(/^[^-]+-\s*/, ""), fontSize: 10 },
-      { text: p.qty, alignment: "center", fontSize: 10 },
-      { text: p.unit || "", alignment: "center", fontSize: 10 },
-      { text: Number(p.price).toFixed(2), alignment: "right", fontSize: 10 },
-      { text: (parseFloat(p.qty) * parseFloat(p.price)).toFixed(2), alignment: "right", fontSize: 10 }
-    ]));
-
-    const docDefinition = {
+    return {
       pageSize: "LETTER",
       pageMargins: [40, 110, 40, 120],
       header: {
@@ -706,8 +718,8 @@ function AdminDashboard() {
         { table: { widths: ["*", 40, 40, 60, 60], headerRows: 1, body: [[{ text: "JOB/ITEM DESCRIPTION", bold: true, fontSize: 10 }, { text: "QNT", bold: true, alignment: "center", fontSize: 10 }, { text: "UNIT", bold: true, alignment: "center", fontSize: 10 }, { text: "AMOUNT", bold: true, alignment: "right", fontSize: 10 }, { text: "TOTAL AMOUNT", bold: true, alignment: "right", fontSize: 10 }], ...serviceRows] }, margin: [0, 0, 0, 10] },
         { text: "PARTS", style: "sectitle" },
         { table: { widths: ["*", 40, 40, 60, 60], headerRows: 1, body: [[{ text: "DESCRIPTION", bold: true, fontSize: 10 }, { text: "QNT", bold: true, alignment: "center", fontSize: 10 }, { text: "UNIT", bold: true, alignment: "center", fontSize: 10 }, { text: "AMOUNT", bold: true, alignment: "right", fontSize: 10 }, { text: "TOTAL AMOUNT", bold: true, alignment: "right", fontSize: 10 }], ...partsRows] }, margin: [0, 0, 0, 15] },
-        { text: `Subtotal: ₱${jobData.subtotal.toFixed(2)}`, alignment: "right", fontSize: 10 },
-        { text: `Total: ₱${jobData.grandTotal.toFixed(2)}`, bold: true, alignment: "right", fontSize: 11, margin: [0, 0, 0, 20] }
+        { text: `Subtotal: \u20b1${Number(jobData.subtotal || 0).toFixed(2)}`, alignment: "right", fontSize: 10 },
+        { text: `Total: \u20b1${Number(jobData.grandTotal || 0).toFixed(2)}`, bold: true, alignment: "right", fontSize: 11, margin: [0, 0, 0, 20] }
       ],
 
       footer: function (currentPage, pageCount) {
@@ -757,14 +769,74 @@ function AdminDashboard() {
       },
       styles: { header: { fontSize: 16, bold: true }, subheader: { fontSize: 10 }, sectitle: { fontSize: 11, bold: true, margin: [0, 5, 0, 5] } }
     };
+  };
 
-    pdfMake.createPdf(docDefinition)
-      .download(`JOB-ORDER-${jobData.joNumber}.pdf`);
+  const exportJobOrderPDF = async () => {
+    const currentJob = editJobId !== null ? jobOrders.find(j => j.id === editJobId) : null;
+    const rawJobNo = currentJob?.joNumber ?? currentJob?.job_order_no ?? jobOrderNo;
+    const formattedJobNo = formatJobOrderNo(rawJobNo);
+    const shouldComplete = status !== "Completed";
+
+    const jobData = {
+      joNumber: formattedJobNo,
+      client: clientName,
+      address,
+      vehicleModel,
+      plateNumber,
+      dateIn,
+      dateRelease,
+      assignedTo,
+      contactNumber,
+      subtotal,
+      discount,
+      grandTotal,
+      services,
+      parts
+    };
+
+    const docDefinition = await buildPdfDocDefinition(jobData);
+    pdfMake.createPdf(docDefinition).download(`JOB-ORDER-${jobData.joNumber}.pdf`);
 
     if (shouldComplete) {
       setStatus("Completed");
       await persistJobOrder("Completed");
     }
+  };
+
+  const buildJobDataFromOrder = (order) => {
+    const rawNo = order?.joNumber ?? order?.job_order_no ?? 0;
+    return {
+      joNumber: formatJobOrderNo(rawNo),
+      client: order?.client || order?.customer_name || "",
+      address: order?.address || "",
+      vehicleModel: order?.vehicleModel || order?.model || "",
+      plateNumber: order?.plate || order?.plate_no || "",
+      dateIn: order?.dateIn || order?.date || "",
+      dateRelease: order?.dateRelease || order?.date_release || "",
+      assignedTo: order?.assignedTo || order?.assigned_to || "",
+      contactNumber: order?.contactNumber || order?.contact_no || "",
+      subtotal: parseFloat(order?.subtotal || 0) || 0,
+      discount: parseFloat(order?.discount || 0) || 0,
+      grandTotal: parseFloat(order?.total || order?.total_amount || 0) || 0,
+      services: order?.services || [],
+      parts: order?.parts || []
+    };
+  };
+
+  const viewJobOrderPDF = async (orderId) => {
+    const order = jobOrders.find((j) => j.id === orderId);
+    if (!order) return;
+    const jobData = buildJobDataFromOrder(order);
+    const docDefinition = await buildPdfDocDefinition(jobData);
+    pdfMake.createPdf(docDefinition).open();
+  };
+
+  const downloadJobOrderPDF = async (orderId) => {
+    const order = jobOrders.find((j) => j.id === orderId);
+    if (!order) return;
+    const jobData = buildJobDataFromOrder(order);
+    const docDefinition = await buildPdfDocDefinition(jobData);
+    pdfMake.createPdf(docDefinition).download(`JOB-ORDER-${jobData.joNumber}.pdf`);
   };
 
   const loadBase64Image = (url) => {
@@ -1017,11 +1089,16 @@ function AdminDashboard() {
                         <td>{o.dateIn || o.date}</td>
                         <td>{o.dateRelease || o.date_release || '-'}</td>
                         <td className="actions">
-                          <button className="view-edit-btn" onClick={() => handleEditJob(o.id)}>
-                            {o.status === "Completed" ? "View/Print" : "Edit"}
-                          </button>
-                          {o.status !== "Completed" && (
-                            <button className="delete-btn" onClick={() => handleDeleteJobOrder(o.id)} style={{ marginLeft: 8 }}>Delete</button>
+                          {o.status === "Completed" ? (
+                            <>
+                              <button className="view-edit-btn" onClick={() => viewJobOrderPDF(o.id)}>View</button>
+                              <button className="view-edit-btn" onClick={() => downloadJobOrderPDF(o.id)} style={{ marginLeft: 8 }}>Download</button>
+                            </>
+                          ) : (
+                            <>
+                              <button className="view-edit-btn" onClick={() => handleEditJob(o.id)}>Edit</button>
+                              <button className="delete-btn" onClick={() => handleDeleteJobOrder(o.id)} style={{ marginLeft: 8 }}>Delete</button>
+                            </>
                           )}
                         </td>
                       </tr>
@@ -1041,7 +1118,7 @@ function AdminDashboard() {
                   Job Order No. {formatJobOrderNo(modalJobNumber)}
                 </strong>
                 </p>
-                <button className="export-btn" onClick={exportJobOrderPDF} disabled={!isJobFormValid()}>Export as PDF</button>
+                <button className="export-btn" onClick={exportJobOrderPDF} disabled={!isJobFormValid()}>Download PDF</button>
               </div>
 
               <div className="modal-body">
@@ -1239,3 +1316,4 @@ function AdminDashboard() {
 }
 
 export default AdminDashboard;
+
